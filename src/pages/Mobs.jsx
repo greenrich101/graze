@@ -33,10 +33,11 @@ function Mobs() {
       return
     }
 
-    // Fetch open movements to get current paddock info
+    // Fetch active movements to get current paddock info
     const { data: openMovements } = await supabase
       .from('movements')
       .select('mob_name, paddock_name, actual_move_in_date')
+      .not('actual_move_in_date', 'is', null)
       .is('actual_move_out_date', null)
 
     const movementMap = {}
@@ -67,7 +68,11 @@ function Mobs() {
   const handleCreate = async (mob) => {
     const { error } = await supabase
       .from('mobs')
-      .insert([{ name: mob.name, description: mob.description, property_id: propertyId }])
+      .insert([{
+        name: mob.name,
+        description: mob.description,
+        property_id: propertyId,
+      }])
 
     if (error) {
       setError(error.message)
@@ -82,7 +87,10 @@ function Mobs() {
   const handleUpdate = async (mob) => {
     const { error } = await supabase
       .from('mobs')
-      .update({ name: mob.name, description: mob.description })
+      .update({
+        name: mob.name,
+        description: mob.description,
+      })
       .eq('id', mob.id)
 
     if (error) {
@@ -132,6 +140,7 @@ function Mobs() {
           mob={editingMob}
           onSubmit={editingMob ? handleUpdate : handleCreate}
           onCancel={() => { setShowForm(false); setEditingMob(null) }}
+
         />
       )}
 

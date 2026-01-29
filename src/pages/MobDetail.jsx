@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useProperty } from '../contexts/PropertyContext'
+import MovementList from '../components/MovementList'
 
 const CATTLE_TYPES = ['cow', 'calf', 'bull', 'steer', 'heifer', 'weaner', 'other']
 
@@ -12,11 +13,15 @@ function MobDetail() {
   const [mob, setMob] = useState(null)
   const [composition, setComposition] = useState([])
   const [openMovement, setOpenMovement] = useState(null)
+  const [plannedMovement, setPlannedMovement] = useState(null)
   const [activeRequirements, setActiveRequirements] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [recentMovements, setRecentMovements] = useState([])
   const [editingComp, setEditingComp] = useState(false)
   const [compDraft, setCompDraft] = useState({})
+  const [executing, setExecuting] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
 
   useEffect(() => {
     fetchMob()
@@ -55,27 +60,48 @@ function MobDetail() {
     ;(compData || []).forEach((c) => { draft[c.cattle_type] = c.count })
     setCompDraft(draft)
 
-    // Fetch open movement
-    const { data: moveData } = await supabase
+    // Fetch active movement (actual_move_in_date IS NOT NULL, actual_move_out_date IS NULL)
+    const { data: activeData } = await supabase
       .from('movements')
       .select('*')
       .eq('mob_name', decodedName)
+      .not('actual_move_in_date', 'is', null)
       .is('actual_move_out_date', null)
       .single()
 
-    setOpenMovement(moveData || null)
+    setOpenMovement(activeData || null)
+
+    // Fetch planned movement (actual_move_in_date IS NULL)
+    const { data: plannedData } = await supabase
+      .from('movements')
+      .select('*')
+      .eq('mob_name', decodedName)
+      .is('actual_move_in_date', null)
+      .single()
+
+    setPlannedMovement(plannedData || null)
 
     // Fetch active requirements if there's an open movement
-    if (moveData) {
+    if (activeData) {
       const { data: reqData } = await supabase
         .from('movement_requirements')
         .select('*, requirement_types(name)')
-        .eq('movement_record_key', moveData.record_key)
+        .eq('movement_record_key', activeData.record_key)
 
       setActiveRequirements(reqData || [])
     } else {
       setActiveRequirements([])
     }
+
+    // Fetch recent movements (last 5)
+    const { data: recentData } = await supabase
+      .from('movements')
+      .select('*, movement_requirements(*, requirement_types(name))')
+      .eq('mob_name', decodedName)
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    setRecentMovements(recentData || [])
 
     setLoading(false)
   }
@@ -87,7 +113,6 @@ function MobDetail() {
 
   const handleSaveComposition = async () => {
     setError('')
-    // Delete existing, then insert non-zero entries
     await supabase.from('mob_composition').delete().eq('mob_name', decodedName)
 
     const rows = Object.entries(compDraft)
@@ -106,6 +131,64 @@ function MobDetail() {
     fetchMob()
   }
 
+  const handleExecuteMove = async () => {
+    setExecuting(true)
+    setError('')
+    const { error: rpcErr } = await supabase.rpc('execute_movement', {
+      p_mob_name: decodedName,
+    })
+    if (rpcErr) {
+      setError(rpcErr.message)
+      setExecuting(false)
+      return
+    }
+    setExecuting(false)
+    fetchMob()
+  }
+
+  const handleDeleteMovement = async (recordKey) => {
+    if (!confirm('Are you sure you want to delete this movement?')) return
+    setError('')
+    const { error: delErr } = await supabase
+      .from('movements')
+      .delete()
+      .eq('record_key', recordKey)
+    if (delErr) {
+      setError(delErr.message)
+      return
+    }
+    fetchMob()
+  }
+
+  const handleUpdateNotes = async (recordKey, notes) => {
+    setError('')
+    const { error: updErr } = await supabase
+      .from('movements')
+      .update({ notes: notes || null })
+      .eq('record_key', recordKey)
+    if (updErr) {
+      setError(updErr.message)
+      return
+    }
+    fetchMob()
+  }
+
+  const handleCancelPlan = async () => {
+    setCancelling(true)
+    setError('')
+    const { error: delErr } = await supabase
+      .from('movements')
+      .delete()
+      .eq('record_key', plannedMovement.record_key)
+    if (delErr) {
+      setError(delErr.message)
+      setCancelling(false)
+      return
+    }
+    setCancelling(false)
+    fetchMob()
+  }
+
   if (loading) {
     return <div className="loading">Loading mob...</div>
   }
@@ -120,7 +203,7 @@ function MobDetail() {
         <h2>{mob.name}</h2>
         <div className="page-header-actions">
           <Link to={`/mobs/${encodeURIComponent(mob.name)}/move`} className="btn btn-primary">
-            Record Move
+            {plannedMovement ? 'Edit Plan' : 'Plan Move'}
           </Link>
           <Link to={`/mobs/${encodeURIComponent(mob.name)}/split`} className="btn btn-secondary">
             Split
@@ -168,6 +251,53 @@ function MobDetail() {
           )}
         </div>
       </div>
+
+      {/* Planned move */}
+      {plannedMovement && (
+        <div className="detail-card">
+          <h3>Planned Move</h3>
+          <div className="detail-grid">
+            <div className="detail-item">
+              <span className="detail-label">Next paddock</span>
+              <span className="detail-value">
+                <Link to={`/paddocks/${encodeURIComponent(plannedMovement.paddock_name)}`}>
+                  {plannedMovement.paddock_name}
+                </Link>
+              </span>
+            </div>
+            <div className="detail-item">
+              <span className="detail-label">Planned date</span>
+              <span className="detail-value">
+                {plannedMovement.planned_move_in_date
+                  ? new Date(plannedMovement.planned_move_in_date + 'T00:00').toLocaleDateString()
+                  : '—'}
+              </span>
+            </div>
+            {plannedMovement.notes && (
+              <div className="detail-item">
+                <span className="detail-label">Notes</span>
+                <span className="detail-value">{plannedMovement.notes}</span>
+              </div>
+            )}
+          </div>
+          <div className="form-actions" style={{ marginTop: '0.75rem' }}>
+            <button
+              className="btn btn-primary"
+              onClick={handleExecuteMove}
+              disabled={executing}
+            >
+              {executing ? 'Executing...' : 'Execute Move'}
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={handleCancelPlan}
+              disabled={cancelling}
+            >
+              {cancelling ? 'Cancelling...' : 'Cancel Plan'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Active requirements */}
       <div className="detail-card">
@@ -229,6 +359,21 @@ function MobDetail() {
             )}
           </div>
         )}
+      </div>
+
+      {/* Move Log */}
+      <div className="detail-card">
+        <div className="detail-card-header">
+          <h3>Move Log</h3>
+          <Link to={`/mobs/${encodeURIComponent(mob.name)}/history`} className="btn btn-secondary btn-sm">
+            View all
+          </Link>
+        </div>
+        <MovementList
+          movements={recentMovements}
+          onDelete={handleDeleteMovement}
+          onUpdateNotes={handleUpdateNotes}
+        />
       </div>
     </div>
   )

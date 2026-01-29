@@ -11,7 +11,10 @@ function MobForm({ mob, onSubmit, onCancel }) {
     setLoading(true)
     setError('')
 
-    const payload = { name: name.trim(), description: description.trim() || null }
+    const payload = {
+      name: name.trim(),
+      description: description.trim() || null,
+    }
     if (mob) payload.id = mob.id
 
     const success = await onSubmit(payload)

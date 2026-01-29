@@ -14,7 +14,7 @@ function MobHistory() {
       .from('movements')
       .select('*, movement_requirements(*, requirement_types(name))')
       .eq('mob_name', decodedName)
-      .order('actual_move_in_date', { ascending: false })
+      .order('created_at', { ascending: false })
       .then(({ data }) => {
         setMovements(data || [])
         setLoading(false)

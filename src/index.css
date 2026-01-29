@@ -594,6 +594,14 @@ body {
   border-radius: 6px;
   background: var(--gray-100);
   border-left: 3px solid var(--gray-300);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.movement-row-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .movement-row.movement-open {
@@ -753,6 +761,115 @@ body {
 .dashboard-card-footer {
   padding: 0.75rem 1rem;
   border-top: 1px solid var(--gray-200);
+}
+
+/* Success message */
+.success-message {
+  background-color: #d1e7dd;
+  color: #0f5132;
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+/* CSV Import */
+.csv-import-container {
+  background: var(--white);
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1.5rem;
+}
+
+.csv-import-container h3 {
+  margin-bottom: 0.5rem;
+}
+
+.csv-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.csv-preview-table th,
+.csv-preview-table td {
+  text-align: left;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--gray-300);
+}
+
+.csv-preview-table th {
+  background: var(--gray-100);
+  font-weight: 600;
+}
+
+.csv-error-row {
+  background-color: #f8d7da;
+  color: #842029;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.badge-planned {
+  background: #fff3cd;
+  color: #664d03;
+}
+
+.badge-executed {
+  background: #d1e7dd;
+  color: #0f5132;
+}
+
+/* Movement row actions */
+.movement-row-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  margin-left: 0.75rem;
+  align-items: flex-end;
+}
+
+.movement-notes-edit {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+
+.movement-notes-edit input {
+  flex: 1;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-family: inherit;
+}
+
+/* Composition line under head badge */
+.head-comp-line {
+  font-size: 0.75rem;
+  color: var(--gray-600);
+  font-weight: 400;
+  margin-top: 0.15rem;
+}
+
+/* Summary composition breakdown */
+.summary-breakdown {
+  font-size: 0.75rem;
+  color: var(--gray-600);
+  margin-top: 0.15rem;
+  text-transform: capitalize;
 }
 
 /* Responsive */

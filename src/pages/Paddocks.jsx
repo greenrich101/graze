@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useProperty } from '../contexts/PropertyContext'
 import PaddockForm from '../components/PaddockForm'
+import CsvImport from '../components/CsvImport'
 
 function Paddocks() {
   const { propertyId } = useProperty()
@@ -11,6 +12,8 @@ function Paddocks() {
   const [error, setError] = useState('')
   const [editingPaddock, setEditingPaddock] = useState(null)
   const [showForm, setShowForm] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+  const [importMessage, setImportMessage] = useState('')
 
   useEffect(() => {
     fetchPaddocks()
@@ -87,6 +90,28 @@ function Paddocks() {
     setPaddocks(paddocks.filter((p) => p.name !== name))
   }
 
+  const handleImport = async (rows) => {
+    const payload = rows.map((r) => ({
+      name: r.name,
+      area_acres: r.area_acres,
+      property_id: propertyId,
+    }))
+
+    const { error } = await supabase
+      .from('paddocks')
+      .upsert(payload, { onConflict: 'name' })
+
+    if (error) {
+      setError(error.message)
+      return
+    }
+
+    setShowImport(false)
+    setImportMessage(`Imported ${rows.length} paddock${rows.length !== 1 ? 's' : ''}`)
+    fetchPaddocks()
+    setTimeout(() => setImportMessage(''), 4000)
+  }
+
   if (loading) {
     return <div className="loading">Loading paddocks...</div>
   }
@@ -95,18 +120,39 @@ function Paddocks() {
     <div className="paddocks-page">
       <div className="page-header">
         <h2>Paddocks</h2>
-        <button
-          className="btn btn-primary"
-          onClick={() => {
-            setShowForm(true)
-            setEditingPaddock(null)
-          }}
-        >
-          Add Paddock
-        </button>
+        <div className="page-header-actions">
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              setShowImport(true)
+              setShowForm(false)
+              setEditingPaddock(null)
+            }}
+          >
+            Import CSV
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setShowForm(true)
+              setShowImport(false)
+              setEditingPaddock(null)
+            }}
+          >
+            Add Paddock
+          </button>
+        </div>
       </div>
 
       {error && <div className="error-message">{error}</div>}
+      {importMessage && <div className="success-message">{importMessage}</div>}
+
+      {showImport && (
+        <CsvImport
+          onImport={handleImport}
+          onCancel={() => setShowImport(false)}
+        />
+      )}
 
       {(showForm || editingPaddock) && (
         <PaddockForm

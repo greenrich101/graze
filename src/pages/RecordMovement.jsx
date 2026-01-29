@@ -17,6 +17,7 @@ function RecordMovement() {
   const [error, setError] = useState('')
   const [currentPaddock, setCurrentPaddock] = useState(null)
   const [occupiedPaddocks, setOccupiedPaddocks] = useState(new Set())
+  const [existingPlan, setExistingPlan] = useState(null)
 
   // Requirements state
   const [requirementTypes, setRequirementTypes] = useState([])
@@ -32,10 +33,12 @@ function RecordMovement() {
       .order('name')
       .then(({ data }) => setPaddocks(data || []))
 
+    // Fetch active movements only (actual_move_in_date IS NOT NULL) — planned moves don't block
     supabase
       .from('movements')
-      .select('paddock_name, mob_name')
+      .select('paddock_name, mob_name, actual_move_in_date')
       .is('actual_move_out_date', null)
+      .not('actual_move_in_date', 'is', null)
       .then(({ data }) => {
         const ownPaddock = data?.find((m) => m.mob_name === decodedName)?.paddock_name
         if (ownPaddock) setCurrentPaddock(ownPaddock)
@@ -47,6 +50,28 @@ function RecordMovement() {
         setOccupiedPaddocks(occupied)
       })
 
+    // Fetch existing planned movement to pre-fill form
+    supabase
+      .from('movements')
+      .select('*, movement_requirements(*, requirement_types(name))')
+      .eq('mob_name', decodedName)
+      .is('actual_move_in_date', null)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setExistingPlan(data)
+          setToPaddock(data.paddock_name)
+          setMoveDate(data.planned_move_in_date || new Date().toISOString().split('T')[0])
+          setNotes(data.notes || '')
+          // Pre-fill requirements
+          const reqs = {}
+          ;(data.movement_requirements || []).forEach((r) => {
+            reqs[r.requirement_type_id] = { checked: true, notes: r.notes || '' }
+          })
+          setSelectedReqs(reqs)
+        }
+      })
+
     supabase
       .from('requirement_types')
       .select('*')
@@ -54,12 +79,9 @@ function RecordMovement() {
       .then(({ data }) => setRequirementTypes(data || []))
   }, [propertyId, decodedName])
 
-  // When destination paddock changes, load its default requirements
+  // When destination paddock changes (and no existing plan pre-filling), load default requirements
   useEffect(() => {
-    if (!toPaddock) {
-      setSelectedReqs({})
-      return
-    }
+    if (!toPaddock || existingPlan) return
 
     supabase
       .from('paddock_requirements')
@@ -109,10 +131,10 @@ function RecordMovement() {
         notes: v.notes || null,
       }))
 
-    const { error: rpcErr } = await supabase.rpc('record_movement', {
+    const { error: rpcErr } = await supabase.rpc('plan_movement', {
       p_mob_name: decodedName,
       p_to_paddock: toPaddock,
-      p_move_date: moveDate,
+      p_planned_move_date: moveDate,
       p_notes: notes || null,
       p_requirements: reqRows,
     })
@@ -126,9 +148,11 @@ function RecordMovement() {
     navigate(`/mobs/${encodeURIComponent(decodedName)}`)
   }
 
+  const isEditing = !!existingPlan
+
   return (
     <div className="movement-page">
-      <h2>Record Move — {decodedName}</h2>
+      <h2>{isEditing ? 'Edit Plan' : 'Plan Move'} — {decodedName}</h2>
       {currentPaddock && (
         <p className="current-paddock-info">Currently in <strong>{currentPaddock}</strong></p>
       )}
@@ -152,7 +176,7 @@ function RecordMovement() {
         </div>
 
         <div className="form-group">
-          <label>Move Date</label>
+          <label>Planned Move Date</label>
           <input type="date" value={moveDate} onChange={(e) => setMoveDate(e.target.value)} required />
         </div>
 
@@ -205,7 +229,7 @@ function RecordMovement() {
             Cancel
           </button>
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Recording...' : 'Record Move'}
+            {loading ? 'Saving...' : isEditing ? 'Update Plan' : 'Plan Move'}
           </button>
         </div>
       </form>
