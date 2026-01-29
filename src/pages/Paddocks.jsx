@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../contexts/AuthContext'
+import { useProperty } from '../contexts/PropertyContext'
 import PaddockForm from '../components/PaddockForm'
 
 function Paddocks() {
-  const { user } = useAuth()
+  const { propertyId } = useProperty()
   const [paddocks, setPaddocks] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -13,14 +14,16 @@ function Paddocks() {
 
   useEffect(() => {
     fetchPaddocks()
-  }, [])
+  }, [propertyId])
 
   const fetchPaddocks = async () => {
+    if (!propertyId) return
     setLoading(true)
     const { data, error } = await supabase
       .from('paddocks')
       .select('*')
-      .order('created_at', { ascending: false })
+      .eq('property_id', propertyId)
+      .order('name')
 
     if (error) {
       setError(error.message)
@@ -33,7 +36,7 @@ function Paddocks() {
   const handleCreate = async (paddock) => {
     const { data, error } = await supabase
       .from('paddocks')
-      .insert([{ ...paddock, user_id: user.id }])
+      .insert([{ name: paddock.name, area_acres: paddock.area_acres, property_id: propertyId }])
       .select()
 
     if (error) {
@@ -41,7 +44,7 @@ function Paddocks() {
       return false
     }
 
-    setPaddocks([data[0], ...paddocks])
+    setPaddocks([...paddocks, data[0]].sort((a, b) => a.name.localeCompare(b.name)))
     setShowForm(false)
     return true
   }
@@ -49,8 +52,8 @@ function Paddocks() {
   const handleUpdate = async (paddock) => {
     const { data, error } = await supabase
       .from('paddocks')
-      .update({ name: paddock.name, acres: paddock.acres })
-      .eq('id', paddock.id)
+      .update({ name: paddock.name, area_acres: paddock.area_acres })
+      .eq('name', paddock.originalName)
       .select()
 
     if (error) {
@@ -58,12 +61,15 @@ function Paddocks() {
       return false
     }
 
-    setPaddocks(paddocks.map((p) => (p.id === paddock.id ? data[0] : p)))
+    setPaddocks(
+      paddocks.map((p) => (p.name === paddock.originalName ? data[0] : p))
+        .sort((a, b) => a.name.localeCompare(b.name))
+    )
     setEditingPaddock(null)
     return true
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (name) => {
     if (!confirm('Are you sure you want to delete this paddock?')) {
       return
     }
@@ -71,14 +77,14 @@ function Paddocks() {
     const { error } = await supabase
       .from('paddocks')
       .delete()
-      .eq('id', id)
+      .eq('name', name)
 
     if (error) {
       setError(error.message)
       return
     }
 
-    setPaddocks(paddocks.filter((p) => p.id !== id))
+    setPaddocks(paddocks.filter((p) => p.name !== name))
   }
 
   if (loading) {
@@ -118,10 +124,10 @@ function Paddocks() {
       ) : (
         <div className="paddocks-list">
           {paddocks.map((paddock) => (
-            <div key={paddock.id} className="paddock-card">
+            <div key={paddock.name} className="paddock-card">
               <div className="paddock-info">
-                <h3>{paddock.name}</h3>
-                <p>{paddock.acres} acres</p>
+                <h3><Link to={`/paddocks/${encodeURIComponent(paddock.name)}`}>{paddock.name}</Link></h3>
+                <p>{paddock.area_acres} acres</p>
               </div>
               <div className="paddock-actions">
                 <button
@@ -132,7 +138,7 @@ function Paddocks() {
                 </button>
                 <button
                   className="btn btn-danger"
-                  onClick={() => handleDelete(paddock.id)}
+                  onClick={() => handleDelete(paddock.name)}
                 >
                   Delete
                 </button>

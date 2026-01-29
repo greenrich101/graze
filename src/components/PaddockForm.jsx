@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 function PaddockForm({ paddock, onSubmit, onCancel }) {
   const [name, setName] = useState(paddock?.name || '')
-  const [acres, setAcres] = useState(paddock?.acres || '')
+  const [areaAcres, setAreaAcres] = useState(paddock?.area_acres || '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -13,11 +13,11 @@ function PaddockForm({ paddock, onSubmit, onCancel }) {
 
     const paddockData = {
       name: name.trim(),
-      acres: parseFloat(acres),
+      area_acres: parseFloat(areaAcres),
     }
 
-    if (paddock?.id) {
-      paddockData.id = paddock.id
+    if (paddock) {
+      paddockData.originalName = paddock.name
     }
 
     const success = await onSubmit(paddockData)
@@ -46,14 +46,14 @@ function PaddockForm({ paddock, onSubmit, onCancel }) {
         </div>
 
         <div className="form-group">
-          <label htmlFor="acres">Acres</label>
+          <label htmlFor="area_acres">Acres</label>
           <input
-            id="acres"
+            id="area_acres"
             type="number"
             step="0.1"
             min="0"
-            value={acres}
-            onChange={(e) => setAcres(e.target.value)}
+            value={areaAcres}
+            onChange={(e) => setAreaAcres(e.target.value)}
             required
           />
         </div>

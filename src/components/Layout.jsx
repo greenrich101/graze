@@ -12,8 +12,10 @@ function Layout() {
     <div className="app-layout">
       <header className="header">
         <div className="header-content">
-          <h1 className="logo">Graze</h1>
+          <h1 className="logo"><Link to="/">Graze</Link></h1>
           <nav className="nav">
+            <Link to="/">Dashboard</Link>
+            <Link to="/mobs">Mobs</Link>
             <Link to="/paddocks">Paddocks</Link>
           </nav>
           <div className="user-info">
