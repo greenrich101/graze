@@ -91,7 +91,7 @@ function Mobs() {
         name: mob.name,
         description: mob.description,
       })
-      .eq('id', mob.id)
+      .eq('name', mob.originalName || mob.name)
 
     if (error) {
       setError(error.message)
@@ -108,13 +108,13 @@ function Mobs() {
       return
     }
 
-    const { error } = await supabase.from('mobs').delete().eq('id', mob.id)
+    const { error } = await supabase.from('mobs').delete().eq('name', mob.name)
     if (error) {
       setError(error.message)
       return
     }
 
-    setMobs(mobs.filter((m) => m.id !== mob.id))
+    setMobs(mobs.filter((m) => m.name !== mob.name))
   }
 
   if (loading) {
@@ -149,7 +149,7 @@ function Mobs() {
       ) : (
         <div className="mob-list">
           {mobs.map((mob) => (
-            <div key={mob.id} className="mob-card">
+            <div key={mob.name} className="mob-card">
               <div className="mob-card-main">
                 <h3><Link to={`/mobs/${encodeURIComponent(mob.name)}`}>{mob.name}</Link></h3>
                 {mob.description && <p className="mob-description">{mob.description}</p>}

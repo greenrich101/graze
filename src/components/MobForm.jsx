@@ -15,7 +15,7 @@ function MobForm({ mob, onSubmit, onCancel }) {
       name: name.trim(),
       description: description.trim() || null,
     }
-    if (mob) payload.id = mob.id
+    if (mob) payload.originalName = mob.name
 
     const success = await onSubmit(payload)
     if (!success) {

@@ -61,14 +61,14 @@ function Dashboard() {
       plannedMovements.forEach((m) => { plannedMap[m.mob_name] = m })
     }
 
-    // Fetch active requirements for all active movements
+    // Fetch requirements for planned movements only (requirements are prep tasks before a move)
     const reqMap = {}
-    const activeKeys = (activeMovements || []).map((m) => m.record_key).filter(Boolean)
-    if (activeKeys.length > 0) {
+    const plannedKeys = (plannedMovements || []).map((m) => m.record_key).filter(Boolean)
+    if (plannedKeys.length > 0) {
       const { data: reqData } = await supabase
         .from('movement_requirements')
         .select('*, requirement_types(name)')
-        .in('movement_record_key', activeKeys)
+        .in('movement_record_key', plannedKeys)
       if (reqData) {
         reqData.forEach((r) => {
           if (!reqMap[r.movement_record_key]) reqMap[r.movement_record_key] = []
@@ -81,18 +81,18 @@ function Dashboard() {
       const headCount = (mob.mob_composition || []).reduce((sum, c) => sum + c.count, 0)
       const activeMove = activeMap[mob.name]
       const plannedMove = plannedMap[mob.name]
-      const daysGrazing = activeMove
-        ? Math.floor((Date.now() - new Date(activeMove.actual_move_in_date).getTime()) / 86400000)
+      const daysUntilMove = plannedMove?.planned_move_in_date
+        ? Math.max(0, Math.ceil((new Date(plannedMove.planned_move_in_date + 'T00:00').getTime() - Date.now()) / 86400000))
         : null
       return {
         ...mob,
         headCount,
         currentPaddock: activeMove?.paddock_name || null,
-        daysGrazing,
+        daysUntilMove,
         nextPaddock: plannedMove?.paddock_name || null,
         nextMoveDate: plannedMove?.planned_move_in_date || null,
         hasPlannedMove: !!plannedMove,
-        activeRequirements: activeMove ? (reqMap[activeMove.record_key] || []) : [],
+        activeRequirements: reqMap[plannedMove?.record_key] || [],
       }
     })
 
@@ -189,10 +189,10 @@ function Dashboard() {
                   </span>
                 </div>
 
-                {mob.daysGrazing !== null && (
+                {mob.daysUntilMove !== null && (
                   <div className="dashboard-stat">
-                    <span className="detail-label">Days grazing</span>
-                    <span className="detail-value">{mob.daysGrazing}</span>
+                    <span className="detail-label">Days until move</span>
+                    <span className="detail-value">{mob.daysUntilMove === 0 ? 'Today' : mob.daysUntilMove}</span>
                   </div>
                 )}
 

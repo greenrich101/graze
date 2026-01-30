@@ -17,6 +17,7 @@ function Layout() {
             <Link to="/">Dashboard</Link>
             <Link to="/mobs">Mobs</Link>
             <Link to="/paddocks">Paddocks</Link>
+            <Link to="/insights">Insights</Link>
           </nav>
           <div className="user-info">
             <span>{user?.email}</span>

@@ -81,12 +81,12 @@ function MobDetail() {
 
     setPlannedMovement(plannedData || null)
 
-    // Fetch active requirements if there's an open movement
-    if (activeData) {
+    // Fetch requirements from planned movement only (requirements are prep tasks before a move)
+    if (plannedData) {
       const { data: reqData } = await supabase
         .from('movement_requirements')
         .select('*, requirement_types(name)')
-        .eq('movement_record_key', activeData.record_key)
+        .eq('movement_record_key', plannedData.record_key)
 
       setActiveRequirements(reqData || [])
     } else {
@@ -107,8 +107,8 @@ function MobDetail() {
   }
 
   const headCount = composition.reduce((sum, c) => sum + c.count, 0)
-  const daysGrazing = openMovement
-    ? Math.floor((Date.now() - new Date(openMovement.actual_move_in_date).getTime()) / 86400000)
+  const daysUntilMove = plannedMovement?.planned_move_in_date
+    ? Math.max(0, Math.ceil((new Date(plannedMovement.planned_move_in_date + 'T00:00').getTime() - Date.now()) / 86400000))
     : null
 
   const handleSaveComposition = async () => {
@@ -221,9 +221,16 @@ function MobDetail() {
 
       {mob.description && <p className="mob-description">{mob.description}</p>}
 
-      {/* Status summary */}
+      {/* Status summary with composition */}
       <div className="detail-card">
-        <h3>Status</h3>
+        <div className="detail-card-header">
+          <h3>Status</h3>
+          {!editingComp && (
+            <button className="btn btn-secondary btn-sm" onClick={() => setEditingComp(true)}>
+              Edit Composition
+            </button>
+          )}
+        </div>
         <div className="detail-grid">
           <div className="detail-item">
             <span className="detail-label">Head count</span>
@@ -240,8 +247,8 @@ function MobDetail() {
             </span>
           </div>
           <div className="detail-item">
-            <span className="detail-label">Days grazing</span>
-            <span className="detail-value">{daysGrazing !== null ? daysGrazing : '—'}</span>
+            <span className="detail-label">Days until move</span>
+            <span className="detail-value">{daysUntilMove !== null ? (daysUntilMove === 0 ? 'Today' : daysUntilMove) : '—'}</span>
           </div>
           {openMovement?.planned_move_out_date && (
             <div className="detail-item">
@@ -249,7 +256,40 @@ function MobDetail() {
               <span className="detail-value">{openMovement.planned_move_out_date}</span>
             </div>
           )}
+          <div className="detail-item">
+            <span className="detail-label">Composition</span>
+            {composition.length === 0 ? (
+              <span className="detail-value muted">No composition set</span>
+            ) : (
+              <div className="comp-summary">
+                {composition.map((c) => (
+                  <span key={c.cattle_type} className="comp-tag">
+                    {c.count} {c.cattle_type}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+        {editingComp && (
+          <div style={{ marginTop: '0.75rem' }}>
+            {CATTLE_TYPES.map((type) => (
+              <div key={type} className="comp-row">
+                <label>{type}</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={compDraft[type] || 0}
+                  onChange={(e) => setCompDraft({ ...compDraft, [type]: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+            ))}
+            <div className="form-actions">
+              <button className="btn btn-secondary" onClick={() => setEditingComp(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSaveComposition}>Save</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Planned move */}
@@ -298,68 +338,6 @@ function MobDetail() {
           </div>
         </div>
       )}
-
-      {/* Active requirements */}
-      <div className="detail-card">
-        <h3>Active Requirements</h3>
-        {activeRequirements.length === 0 ? (
-          <p className="muted">None active</p>
-        ) : (
-          <ul className="requirements-list">
-            {activeRequirements.map((r) => (
-              <li key={r.id}>
-                {r.requirement_types?.name}
-                {r.notes && <span className="req-notes"> — {r.notes}</span>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* Composition */}
-      <div className="detail-card">
-        <div className="detail-card-header">
-          <h3>Composition</h3>
-          {!editingComp && (
-            <button className="btn btn-secondary" onClick={() => setEditingComp(true)}>
-              Edit
-            </button>
-          )}
-        </div>
-        {editingComp ? (
-          <div>
-            {CATTLE_TYPES.map((type) => (
-              <div key={type} className="comp-row">
-                <label>{type}</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={compDraft[type] || 0}
-                  onChange={(e) => setCompDraft({ ...compDraft, [type]: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-            ))}
-            <div className="form-actions">
-              <button className="btn btn-secondary" onClick={() => setEditingComp(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSaveComposition}>Save</button>
-            </div>
-          </div>
-        ) : (
-          <div>
-            {composition.length === 0 ? (
-              <p className="muted">No composition set</p>
-            ) : (
-              <div className="comp-summary">
-                {composition.map((c) => (
-                  <span key={c.cattle_type} className="comp-tag">
-                    {c.count} {c.cattle_type}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* Move Log */}
       <div className="detail-card">

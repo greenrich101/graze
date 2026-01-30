@@ -11,6 +11,7 @@ import MobHistory from './pages/MobHistory'
 import RecordMovement from './pages/RecordMovement'
 import SplitMob from './pages/SplitMob'
 import MergeMob from './pages/MergeMob'
+import Insights from './pages/Insights'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -47,6 +48,7 @@ function App() {
         <Route path="mobs/:mobName/split" element={<SplitMob />} />
         <Route path="mobs/:mobName/merge" element={<MergeMob />} />
         <Route path="mobs/:mobName/history" element={<MobHistory />} />
+        <Route path="insights" element={<Insights />} />
       </Route>
     </Routes>
   )
