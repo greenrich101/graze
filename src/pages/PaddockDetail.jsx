@@ -64,9 +64,12 @@ function PaddockDetail() {
     setLoading(false)
   }
 
+  const [logError, setLogError] = useState('')
+
   const addPastureLog = async (e) => {
     e.preventDefault()
     setLogSaving(true)
+    setLogError('')
 
     const { data, error: insertErr } = await supabase
       .from('pasture_logs')
@@ -80,7 +83,9 @@ function PaddockDetail() {
       .select()
       .single()
 
-    if (!insertErr && data) {
+    if (insertErr) {
+      setLogError(insertErr.message)
+    } else if (data) {
       setPastureLogs((prev) => [data, ...prev].sort((a, b) => b.log_date.localeCompare(a.log_date)))
       setLogNotes('')
       setLogDate(new Date().toISOString().split('T')[0])
@@ -172,9 +177,10 @@ function PaddockDetail() {
             onChange={(e) => setLogNotes(e.target.value)}
           />
           <button type="submit" className="btn btn-primary btn-sm" disabled={logSaving}>
-            Add
+            Log Entry
           </button>
         </form>
+        {logError && <p className="error-message" style={{ marginTop: '0.5rem' }}>{logError}</p>}
 
         {pastureLogs.length === 0 ? (
           <p className="muted" style={{ marginTop: '0.75rem' }}>No entries yet.</p>
