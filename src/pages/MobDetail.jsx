@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useProperty } from '../contexts/PropertyContext'
 import MovementList from '../components/MovementList'
 
-const CATTLE_TYPES = ['cow', 'calves', 'bull', 'steer', 'heifer', 'weaner', 'other']
+const CATTLE_TYPES = ['cow', 'calf', 'bull', 'steer', 'heifer', 'weaner', 'other']
 
 function MobDetail() {
   const { mobName } = useParams()

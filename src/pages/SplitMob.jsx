@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useProperty } from '../contexts/PropertyContext'
 
-const CATTLE_TYPES = ['cow', 'calves', 'bull', 'steer', 'heifer', 'weaner', 'other']
+const CATTLE_TYPES = ['cow', 'calf', 'bull', 'steer', 'heifer', 'weaner', 'other']
 
 function SplitMob() {
   const { mobName } = useParams()

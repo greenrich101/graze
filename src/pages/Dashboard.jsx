@@ -170,7 +170,7 @@ function Dashboard() {
                     <div className="head-comp-line">
                       {mob.mob_composition
                         .filter((c) => c.count > 0)
-                        .map((c) => `${c.count} ${c.cattle_type}${c.count !== 1 ? 's' : ''}`)
+                        .map((c) => `${c.count} ${c.count !== 1 && c.cattle_type === 'calf' ? 'calves' : c.count !== 1 ? c.cattle_type + 's' : c.cattle_type}`)
                         .join(', ')}
                     </div>
                   )}
