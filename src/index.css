@@ -562,7 +562,7 @@ body {
 .req-check-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
   font-size: 0.875rem;
   cursor: pointer;
 }
@@ -976,6 +976,217 @@ body {
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
+}
+
+/* Individual Animals */
+.animal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.animal-type-group h4 {
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+  color: var(--gray-800);
+  text-transform: capitalize;
+}
+
+.animal-subgroup {
+  margin-bottom: 0.75rem;
+}
+
+.animal-subgroup-header {
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.animal-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.animal-card {
+  background: var(--gray-100);
+  padding: 0.75rem;
+  border-radius: 6px;
+  border-left: 3px solid var(--primary);
+  font-size: 0.875rem;
+}
+
+.animal-card.untagged {
+  border-left-color: var(--gray-400);
+}
+
+.animal-card.muted {
+  background: var(--gray-200);
+  border-left-color: var(--gray-300);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray-600);
+  text-align: center;
+}
+
+.animal-tag {
+  font-weight: 600;
+  padding: 0.25rem 0;
+}
+
+.animal-tag.nlis {
+  color: var(--primary);
+}
+
+.animal-tag.mgmt {
+  color: var(--gray-800);
+}
+
+.animal-detail {
+  color: var(--gray-600);
+  font-size: 0.8rem;
+  padding: 0.15rem 0;
+}
+
+.tag-form {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--gray-300);
+}
+
+.tag-form input {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  margin-bottom: 0.35rem;
+}
+
+.add-animal-form {
+  background: var(--gray-100);
+  padding: 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.radio-group {
+  display: flex;
+  gap: 1rem;
+}
+
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.radio-group input[type='radio'] {
+  width: auto;
+  margin: 0;
+}
+
+.animal-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--gray-300);
+}
+
+.animal-edit-form {
+  width: 100%;
+}
+
+.animal-edit-form input,
+.animal-edit-form select {
+  width: 100%;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  font-family: inherit;
+}
+
+/* Health Events */
+.health-event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.health-event-card {
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: var(--gray-100);
+  border-left: 3px solid #17a2b8;
+}
+
+.health-event-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.health-event-date {
+  font-size: 0.875rem;
+  color: var(--gray-600);
+  font-weight: 500;
+}
+
+.health-event-details {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.health-event-tag {
+  background: var(--gray-200);
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.health-event-type {
+  color: var(--gray-600);
+  text-transform: capitalize;
+}
+
+.health-event-notes {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: var(--white);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: var(--gray-800);
+}
+
+.health-event-notes-edit {
+  margin-top: 0.5rem;
+}
+
+.health-event-notes-edit textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  margin-bottom: 0.5rem;
+}
+
+.health-event-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 /* Responsive */

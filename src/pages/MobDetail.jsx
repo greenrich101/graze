@@ -3,6 +3,10 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useProperty } from '../contexts/PropertyContext'
 import MovementList from '../components/MovementList'
+import AnimalList from '../components/AnimalList'
+import AddAnimalForm from '../components/AddAnimalForm'
+import AnimalCSVImport from '../components/AnimalCSVImport'
+import HealthEventList from '../components/HealthEventList'
 
 const CATTLE_TYPES = ['cow', 'calf', 'bull', 'steer', 'heifer', 'weaner', 'other']
 
@@ -25,9 +29,15 @@ function MobDetail() {
   const [cancelling, setCancelling] = useState(false)
   const [showExecuteForm, setShowExecuteForm] = useState(false)
   const [executeDate, setExecuteDate] = useState(new Date().toISOString().split('T')[0])
+  const [animals, setAnimals] = useState([])
+  const [showAddAnimal, setShowAddAnimal] = useState(false)
+  const [addMode, setAddMode] = useState('form') // 'form' or 'csv'
+  const [healthEvents, setHealthEvents] = useState([])
+  const [loadingHealth, setLoadingHealth] = useState(true)
 
   useEffect(() => {
     fetchMob()
+    fetchHealthEvents()
   }, [decodedName, propertyId])
 
   const fetchMob = async () => {
@@ -106,10 +116,36 @@ function MobDetail() {
 
     setRecentMovements(recentData || [])
 
+    // Fetch animals (individual tracking)
+    const { data: animalsData } = await supabase
+      .from('animals')
+      .select('*')
+      .eq('mob_name', decodedName)
+      .eq('status', 'alive')
+      .order('nlis_tag', { ascending: true, nullsFirst: false })
+
+    setAnimals(animalsData || [])
+
     setLoading(false)
   }
 
-  const headCount = composition.reduce((sum, c) => sum + c.count, 0)
+  const fetchHealthEvents = async () => {
+    setLoadingHealth(true)
+    const { data, error } = await supabase.rpc('get_mob_health_history', {
+      p_mob_name: decodedName,
+      p_limit: 20,
+    })
+
+    if (error) {
+      console.error('Error fetching health events:', error)
+    } else {
+      setHealthEvents(data || [])
+    }
+    setLoadingHealth(false)
+  }
+
+  // Calculate head count from animals table (new system) or fallback to composition (legacy)
+  const headCount = animals.length > 0 ? animals.length : composition.reduce((sum, c) => sum + c.count, 0)
   const daysUntilMove = plannedMovement?.planned_move_in_date
     ? Math.max(0, Math.ceil((new Date(plannedMovement.planned_move_in_date + 'T00:00').getTime() - Date.now()) / 86400000))
     : null
@@ -396,6 +432,81 @@ function MobDetail() {
           onDelete={isHand ? null : handleDeleteMovement}
           onUpdateNotes={isHand ? null : handleUpdateNotes}
         />
+      </div>
+
+      {/* Individual Animals */}
+      <div className="detail-card">
+        <div className="detail-card-header">
+          <h3>Individual Animals</h3>
+          {!isHand && (
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => setShowAddAnimal(!showAddAnimal)}
+            >
+              {showAddAnimal ? 'Cancel' : 'Add Animals'}
+            </button>
+          )}
+        </div>
+        {showAddAnimal && (
+          <div>
+            <div className="radio-group" style={{ marginBottom: '1rem' }}>
+              <label>
+                <input
+                  type="radio"
+                  value="form"
+                  checked={addMode === 'form'}
+                  onChange={(e) => setAddMode(e.target.value)}
+                />
+                Manual Entry
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  value="csv"
+                  checked={addMode === 'csv'}
+                  onChange={(e) => setAddMode(e.target.value)}
+                />
+                CSV Import
+              </label>
+            </div>
+            {addMode === 'form' ? (
+              <AddAnimalForm
+                mobName={decodedName}
+                onSuccess={() => {
+                  setShowAddAnimal(false)
+                  fetchMob()
+                }}
+              />
+            ) : (
+              <AnimalCSVImport
+                mobName={decodedName}
+                onSuccess={() => {
+                  setShowAddAnimal(false)
+                  fetchMob()
+                }}
+              />
+            )}
+          </div>
+        )}
+        {animals.length === 0 ? (
+          <p className="muted">No animals added yet. Use "Add Animals" to get started.</p>
+        ) : (
+          <AnimalList animals={animals} onRefresh={fetchMob} isHand={isHand} />
+        )}
+      </div>
+
+      {/* Health Log */}
+      <div className="detail-card">
+        <h3>Health Log</h3>
+        {loadingHealth ? (
+          <p className="muted">Loading health events...</p>
+        ) : (
+          <HealthEventList
+            events={healthEvents}
+            onUpdate={fetchHealthEvents}
+            readOnly={isHand}
+          />
+        )}
       </div>
     </div>
   )
