@@ -6,7 +6,8 @@ import PaddockForm from '../components/PaddockForm'
 import CsvImport from '../components/CsvImport'
 
 function Paddocks() {
-  const { propertyId } = useProperty()
+  const { propertyId, role } = useProperty()
+  const isHand = role === 'hand'
   const [paddocks, setPaddocks] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -120,28 +121,30 @@ function Paddocks() {
     <div className="paddocks-page">
       <div className="page-header">
         <h2>Paddocks</h2>
-        <div className="page-header-actions">
-          <button
-            className="btn btn-secondary"
-            onClick={() => {
-              setShowImport(true)
-              setShowForm(false)
-              setEditingPaddock(null)
-            }}
-          >
-            Import CSV
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setShowForm(true)
-              setShowImport(false)
-              setEditingPaddock(null)
-            }}
-          >
-            Add Paddock
-          </button>
-        </div>
+        {!isHand && (
+          <div className="page-header-actions">
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setShowImport(true)
+                setShowForm(false)
+                setEditingPaddock(null)
+              }}
+            >
+              Import CSV
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setShowForm(true)
+                setShowImport(false)
+                setEditingPaddock(null)
+              }}
+            >
+              Add Paddock
+            </button>
+          </div>
+        )}
       </div>
 
       {error && <div className="error-message">{error}</div>}
@@ -175,20 +178,22 @@ function Paddocks() {
                 <h3><Link to={`/paddocks/${encodeURIComponent(paddock.name)}`}>{paddock.name}</Link></h3>
                 <p>{paddock.area_acres} acres</p>
               </div>
-              <div className="paddock-actions">
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setEditingPaddock(paddock)}
-                >
-                  Edit
-                </button>
-                <button
-                  className="btn btn-danger"
-                  onClick={() => handleDelete(paddock.name)}
-                >
-                  Delete
-                </button>
-              </div>
+              {!isHand && (
+                <div className="paddock-actions">
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setEditingPaddock(paddock)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="btn btn-danger"
+                    onClick={() => handleDelete(paddock.name)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

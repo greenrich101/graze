@@ -9,7 +9,8 @@ const CONDITION_OPTIONS = ['Poor', 'Fair', 'Good', 'Excellent']
 function PaddockDetail() {
   const { paddockName } = useParams()
   const decodedName = decodeURIComponent(paddockName)
-  const { propertyId } = useProperty()
+  const { propertyId, role } = useProperty()
+  const isHand = role === 'hand'
   const [paddock, setPaddock] = useState(null)
   const [movements, setMovements] = useState([])
   const [loading, setLoading] = useState(true)
@@ -191,7 +192,7 @@ function PaddockDetail() {
                 <th>Date</th>
                 <th>Condition</th>
                 <th>Notes</th>
-                <th></th>
+                {!isHand && <th></th>}
               </tr>
             </thead>
             <tbody>
@@ -204,14 +205,16 @@ function PaddockDetail() {
                     </span>
                   </td>
                   <td>{log.notes || '—'}</td>
-                  <td>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => deletePastureLog(log.id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
+                  {!isHand && (
+                    <td>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => deletePastureLog(log.id)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

@@ -12,11 +12,27 @@ import RecordMovement from './pages/RecordMovement'
 import SplitMob from './pages/SplitMob'
 import MergeMob from './pages/MergeMob'
 
+function ServiceUnavailable() {
+  return (
+    <div className="service-unavailable">
+      <h2>Service Unavailable</h2>
+      <p>Unable to connect to the server. This may be due to maintenance or a network issue.</p>
+      <button className="btn btn-primary" onClick={() => window.location.reload()}>
+        Retry
+      </button>
+    </div>
+  )
+}
+
 function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth()
+  const { user, loading, connectionError } = useAuth()
 
   if (loading) {
     return <div className="loading">Loading...</div>
+  }
+
+  if (connectionError) {
+    return <ServiceUnavailable />
   }
 
   if (!user) {

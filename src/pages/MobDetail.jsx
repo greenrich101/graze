@@ -9,7 +9,8 @@ const CATTLE_TYPES = ['cow', 'calf', 'bull', 'steer', 'heifer', 'weaner', 'other
 function MobDetail() {
   const { mobName } = useParams()
   const decodedName = decodeURIComponent(mobName)
-  const { propertyId } = useProperty()
+  const { propertyId, role } = useProperty()
+  const isHand = role === 'hand'
   const [mob, setMob] = useState(null)
   const [composition, setComposition] = useState([])
   const [openMovement, setOpenMovement] = useState(null)
@@ -22,6 +23,8 @@ function MobDetail() {
   const [compDraft, setCompDraft] = useState({})
   const [executing, setExecuting] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [showExecuteForm, setShowExecuteForm] = useState(false)
+  const [executeDate, setExecuteDate] = useState(new Date().toISOString().split('T')[0])
 
   useEffect(() => {
     fetchMob()
@@ -136,6 +139,7 @@ function MobDetail() {
     setError('')
     const { error: rpcErr } = await supabase.rpc('execute_movement', {
       p_mob_name: decodedName,
+      p_move_date: executeDate,
     })
     if (rpcErr) {
       setError(rpcErr.message)
@@ -143,6 +147,7 @@ function MobDetail() {
       return
     }
     setExecuting(false)
+    setShowExecuteForm(false)
     fetchMob()
   }
 
@@ -205,12 +210,16 @@ function MobDetail() {
           <Link to={`/mobs/${encodeURIComponent(mob.name)}/move`} className="btn btn-primary">
             {plannedMovement ? 'Edit Plan' : 'Plan Move'}
           </Link>
-          <Link to={`/mobs/${encodeURIComponent(mob.name)}/split`} className="btn btn-secondary">
-            Split
-          </Link>
-          <Link to={`/mobs/${encodeURIComponent(mob.name)}/merge`} className="btn btn-secondary">
-            Merge
-          </Link>
+          {!isHand && (
+            <Link to={`/mobs/${encodeURIComponent(mob.name)}/split`} className="btn btn-secondary">
+              Split
+            </Link>
+          )}
+          {!isHand && (
+            <Link to={`/mobs/${encodeURIComponent(mob.name)}/merge`} className="btn btn-secondary">
+              Merge
+            </Link>
+          )}
           <Link to={`/mobs/${encodeURIComponent(mob.name)}/history`} className="btn btn-secondary">
             History
           </Link>
@@ -225,7 +234,7 @@ function MobDetail() {
       <div className="detail-card">
         <div className="detail-card-header">
           <h3>Status</h3>
-          {!editingComp && (
+          {!editingComp && !isHand && (
             <button className="btn btn-secondary btn-sm" onClick={() => setEditingComp(true)}>
               Edit Composition
             </button>
@@ -320,22 +329,57 @@ function MobDetail() {
               </div>
             )}
           </div>
-          <div className="form-actions" style={{ marginTop: '0.75rem' }}>
-            <button
-              className="btn btn-primary"
-              onClick={handleExecuteMove}
-              disabled={executing}
-            >
-              {executing ? 'Executing...' : 'Execute Move'}
-            </button>
-            <button
-              className="btn btn-secondary"
-              onClick={handleCancelPlan}
-              disabled={cancelling}
-            >
-              {cancelling ? 'Cancelling...' : 'Cancel Plan'}
-            </button>
-          </div>
+          {!showExecuteForm ? (
+            <div className="form-actions" style={{ marginTop: '0.75rem' }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setExecuteDate(new Date().toISOString().split('T')[0])
+                  setShowExecuteForm(true)
+                }}
+              >
+                Execute Move
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={handleCancelPlan}
+                disabled={cancelling}
+              >
+                {cancelling ? 'Cancelling...' : 'Cancel Plan'}
+              </button>
+            </div>
+          ) : (
+            <div style={{ marginTop: '0.75rem' }}>
+              <div className="form-group">
+                <label>Move Date</label>
+                <input
+                  type="date"
+                  value={executeDate}
+                  onChange={(e) => setExecuteDate(e.target.value)}
+                  required
+                />
+                <p className="muted" style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                  Use today for current moves, or select a past date for retrospective moves
+                </p>
+              </div>
+              <div className="form-actions">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setShowExecuteForm(false)}
+                  disabled={executing}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleExecuteMove}
+                  disabled={executing}
+                >
+                  {executing ? 'Executing...' : 'Confirm Execute'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -349,8 +393,8 @@ function MobDetail() {
         </div>
         <MovementList
           movements={recentMovements}
-          onDelete={handleDeleteMovement}
-          onUpdateNotes={handleUpdateNotes}
+          onDelete={isHand ? null : handleDeleteMovement}
+          onUpdateNotes={isHand ? null : handleUpdateNotes}
         />
       </div>
     </div>

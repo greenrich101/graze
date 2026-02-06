@@ -8,12 +8,14 @@ export function PropertyProvider({ children }) {
   const { user } = useAuth()
   const [propertyId, setPropertyId] = useState(null)
   const [propertyName, setPropertyName] = useState('')
+  const [role, setRole] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!user) {
       setPropertyId(null)
       setPropertyName('')
+      setRole(null)
       setLoading(false)
       return
     }
@@ -26,7 +28,7 @@ export function PropertyProvider({ children }) {
     // Check for existing membership
     const { data: memberships, error: fetchErr } = await supabase
       .from('user_properties')
-      .select('property_id, properties(id, name)')
+      .select('property_id, role, properties(id, name)')
       .eq('user_id', user.id)
       .limit(1)
 
@@ -40,6 +42,7 @@ export function PropertyProvider({ children }) {
       const prop = memberships[0].properties
       setPropertyId(prop.id)
       setPropertyName(prop.name)
+      setRole(memberships[0].role)
       setLoading(false)
       return
     }
@@ -69,10 +72,11 @@ export function PropertyProvider({ children }) {
 
     setPropertyId(newProp.id)
     setPropertyName(newProp.name)
+    setRole('owner')
     setLoading(false)
   }
 
-  const value = { propertyId, propertyName, loading }
+  const value = { propertyId, propertyName, role, loading }
 
   return (
     <PropertyContext.Provider value={value}>

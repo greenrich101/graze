@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useProperty } from '../contexts/PropertyContext'
 
@@ -7,7 +7,9 @@ function MergeMob() {
   const { mobName } = useParams()
   const decodedName = decodeURIComponent(mobName)
   const navigate = useNavigate()
-  const { propertyId } = useProperty()
+  const { propertyId, role } = useProperty()
+
+  if (role === 'hand') return <Navigate to="/" replace />
 
   const [mobs, setMobs] = useState([])
   const [sourceMob, setSourceMob] = useState('')

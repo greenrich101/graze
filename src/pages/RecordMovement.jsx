@@ -131,7 +131,7 @@ function RecordMovement() {
         notes: v.notes || null,
       }))
 
-    const { error: rpcErr } = await supabase.rpc('plan_movement', {
+    const { data: rpcData, error: rpcErr } = await supabase.rpc('plan_movement', {
       p_mob_name: decodedName,
       p_to_paddock: toPaddock,
       p_planned_move_date: moveDate,
@@ -141,6 +141,12 @@ function RecordMovement() {
 
     if (rpcErr) {
       setError(rpcErr.message)
+      setLoading(false)
+      return
+    }
+
+    if (rpcData === null || rpcData === undefined) {
+      setError('Movement was not saved. The plan_movement function may not exist — check that the SQL migration has been applied.')
       setLoading(false)
       return
     }

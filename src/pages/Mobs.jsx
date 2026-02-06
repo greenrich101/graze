@@ -3,14 +3,18 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useProperty } from '../contexts/PropertyContext'
 import MobForm from '../components/MobForm'
+import AnimalEventLogger from '../components/AnimalEventLogger'
+import AnimalEventList from '../components/AnimalEventList'
 
 function Mobs() {
-  const { propertyId } = useProperty()
+  const { propertyId, role } = useProperty()
+  const isHand = role === 'hand'
   const [mobs, setMobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingMob, setEditingMob] = useState(null)
+  const [recentEvents, setRecentEvents] = useState([])
 
   useEffect(() => {
     fetchMobs()
@@ -62,6 +66,17 @@ function Mobs() {
     })
 
     setMobs(enriched)
+
+    // Fetch recent animal events (last 10)
+    const { data: eventsData } = await supabase
+      .from('animal_events')
+      .select('*')
+      .in('mob_name', (data || []).map((m) => m.name))
+      .order('event_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    setRecentEvents(eventsData || [])
     setLoading(false)
   }
 
@@ -115,6 +130,30 @@ function Mobs() {
     }
 
     setMobs(mobs.filter((m) => m.name !== mob.name))
+  }
+
+  const handleDeleteEvent = async (eventId) => {
+    if (!confirm('Delete this event? This will NOT restore the animals to the mob.')) {
+      return
+    }
+    const { error } = await supabase.from('animal_events').delete().eq('id', eventId)
+    if (error) {
+      setError(error.message)
+      return
+    }
+    fetchMobs()
+  }
+
+  const handleUpdateEventNotes = async (eventId, notes) => {
+    const { error } = await supabase
+      .from('animal_events')
+      .update({ notes: notes || null })
+      .eq('id', eventId)
+    if (error) {
+      setError(error.message)
+      return
+    }
+    fetchMobs()
   }
 
   if (loading) {
@@ -178,6 +217,21 @@ function Mobs() {
           ))}
         </div>
       )}
+
+      {/* Animal Events Section */}
+      <div className="animal-events-section" style={{ marginTop: '2rem' }}>
+        <h2>Animal Events</h2>
+        <AnimalEventLogger onEventLogged={fetchMobs} />
+
+        <div className="detail-card" style={{ marginTop: '1.5rem' }}>
+          <h3>Recent Events</h3>
+          <AnimalEventList
+            events={recentEvents}
+            onDelete={handleDeleteEvent}
+            onUpdateNotes={handleUpdateEventNotes}
+          />
+        </div>
+      </div>
     </div>
   )
 }

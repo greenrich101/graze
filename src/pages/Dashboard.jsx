@@ -9,6 +9,9 @@ function Dashboard() {
   const [paddockCount, setPaddockCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [executingMob, setExecutingMob] = useState(null) // mob name being executed
+  const [executeDate, setExecuteDate] = useState(new Date().toISOString().split('T')[0])
+  const [executing, setExecuting] = useState(false)
 
   useEffect(() => {
     if (!propertyId) return
@@ -25,7 +28,10 @@ function Dashboard() {
       .select('*, mob_composition(*)')
       .eq('property_id', propertyId)
       .order('name')
-    if (mobsErr) console.error('Mobs query failed:', mobsErr.message)
+    if (mobsErr) {
+      console.error('Mobs query failed:', mobsErr.message)
+      setError('Failed to load mobs: ' + mobsErr.message)
+    }
 
     // Fetch active movements (actual_move_in_date IS NOT NULL, actual_move_out_date IS NULL)
     const { data: activeMovements, error: movErr } = await supabase
@@ -33,21 +39,30 @@ function Dashboard() {
       .select('*')
       .not('actual_move_in_date', 'is', null)
       .is('actual_move_out_date', null)
-    if (movErr) console.error('Active movements query failed:', movErr.message)
+    if (movErr) {
+      console.error('Active movements query failed:', movErr.message)
+      setError('Failed to load active movements: ' + movErr.message)
+    }
 
     // Fetch planned movements (actual_move_in_date IS NULL)
     const { data: plannedMovements, error: planErr } = await supabase
       .from('movements')
       .select('*')
       .is('actual_move_in_date', null)
-    if (planErr) console.error('Planned movements query failed:', planErr.message)
+    if (planErr) {
+      console.error('Planned movements query failed:', planErr.message)
+      setError('Failed to load planned movements: ' + planErr.message)
+    }
 
     // Fetch paddock count
     const { count, error: padErr } = await supabase
       .from('paddocks')
       .select('*', { count: 'exact', head: true })
       .eq('property_id', propertyId)
-    if (padErr) console.error('Paddocks query failed:', padErr.message)
+    if (padErr) {
+      console.error('Paddocks query failed:', padErr.message)
+      setError('Failed to load paddocks: ' + padErr.message)
+    }
 
     setPaddockCount(count || 0)
 
@@ -61,14 +76,17 @@ function Dashboard() {
       plannedMovements.forEach((m) => { plannedMap[m.mob_name] = m })
     }
 
-    // Fetch requirements for planned movements only (requirements are prep tasks before a move)
+    // Fetch requirements for both active and planned movements (active while movement is open)
     const reqMap = {}
-    const plannedKeys = (plannedMovements || []).map((m) => m.record_key).filter(Boolean)
-    if (plannedKeys.length > 0) {
+    const allOpenKeys = [
+      ...(activeMovements || []).map((m) => m.record_key),
+      ...(plannedMovements || []).map((m) => m.record_key),
+    ].filter(Boolean)
+    if (allOpenKeys.length > 0) {
       const { data: reqData } = await supabase
         .from('movement_requirements')
         .select('*, requirement_types(name)')
-        .in('movement_record_key', plannedKeys)
+        .in('movement_record_key', allOpenKeys)
       if (reqData) {
         reqData.forEach((r) => {
           if (!reqMap[r.movement_record_key]) reqMap[r.movement_record_key] = []
@@ -92,7 +110,7 @@ function Dashboard() {
         nextPaddock: plannedMove?.paddock_name || null,
         nextMoveDate: plannedMove?.planned_move_in_date || null,
         hasPlannedMove: !!plannedMove,
-        activeRequirements: reqMap[plannedMove?.record_key] || [],
+        activeRequirements: reqMap[activeMove?.record_key] || reqMap[plannedMove?.record_key] || [],
       }
     })
 
@@ -100,15 +118,21 @@ function Dashboard() {
     setLoading(false)
   }
 
-  const handleExecuteMove = async (mobName) => {
+  const handleExecuteMove = async () => {
+    if (!executingMob) return
+    setExecuting(true)
     setError('')
     const { error: rpcErr } = await supabase.rpc('execute_movement', {
-      p_mob_name: mobName,
+      p_mob_name: executingMob,
+      p_move_date: executeDate,
     })
     if (rpcErr) {
       setError(rpcErr.message)
+      setExecuting(false)
       return
     }
+    setExecuting(false)
+    setExecutingMob(null)
     fetchDashboard()
   }
 
@@ -233,20 +257,60 @@ function Dashboard() {
               </div>
 
               <div className="dashboard-card-footer">
-                {mob.hasPlannedMove && (
+                {mob.hasPlannedMove && executingMob !== mob.name && (
                   <button
                     className="btn btn-primary btn-sm"
-                    onClick={() => handleExecuteMove(mob.name)}
+                    onClick={() => {
+                      setExecuteDate(new Date().toISOString().split('T')[0])
+                      setExecutingMob(mob.name)
+                    }}
                   >
                     Execute Move
                   </button>
                 )}
-                <Link
-                  to={`/mobs/${encodeURIComponent(mob.name)}/move`}
-                  className="btn btn-secondary btn-sm"
-                >
-                  {mob.hasPlannedMove ? 'Edit Plan' : 'Plan Move'}
-                </Link>
+                {executingMob === mob.name && (
+                  <div style={{ width: '100%', marginTop: '0.5rem' }}>
+                    <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+                      <label style={{ fontSize: '0.85rem', marginBottom: '0.25rem' }}>Move Date</label>
+                      <input
+                        type="date"
+                        value={executeDate}
+                        onChange={(e) => setExecuteDate(e.target.value)}
+                        style={{ width: '100%' }}
+                        required
+                      />
+                      <p className="muted" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                        Today for current moves, or past date for retrospective
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setExecutingMob(null)}
+                        disabled={executing}
+                        style={{ flex: 1 }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={handleExecuteMove}
+                        disabled={executing}
+                        style={{ flex: 1 }}
+                      >
+                        {executing ? 'Executing...' : 'Confirm'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {executingMob !== mob.name && (
+                  <Link
+                    to={`/mobs/${encodeURIComponent(mob.name)}/move`}
+                    className="btn btn-secondary btn-sm"
+                  >
+                    {mob.hasPlannedMove ? 'Edit Plan' : 'Plan Move'}
+                  </Link>
+                )}
               </div>
             </div>
           ))}

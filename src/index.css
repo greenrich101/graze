@@ -127,6 +127,26 @@ body {
   color: var(--gray-600);
 }
 
+.service-unavailable {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  padding: 2rem;
+  color: var(--gray-800);
+}
+
+.service-unavailable h2 {
+  margin-bottom: 0.5rem;
+}
+
+.service-unavailable p {
+  color: var(--gray-600);
+  margin-bottom: 1.5rem;
+}
+
 .muted {
   color: var(--gray-600);
 }
@@ -940,6 +960,22 @@ body {
 .badge-condition-excellent {
   background: #0f5132;
   color: var(--white);
+}
+
+/* Animal Events */
+.animal-events-section {
+  border-top: 1px solid var(--gray-300);
+  padding-top: 2rem;
+}
+
+.badge-danger {
+  background-color: var(--danger);
+  color: var(--white);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 /* Responsive */
