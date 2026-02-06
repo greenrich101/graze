@@ -443,7 +443,7 @@ function MobDetail() {
               className="btn btn-secondary btn-sm"
               onClick={() => setShowAddAnimal(!showAddAnimal)}
             >
-              {showAddAnimal ? 'Cancel' : 'Add Animals'}
+              {showAddAnimal ? 'Cancel' : 'Update Data'}
             </button>
           )}
         </div>
