@@ -67,6 +67,23 @@ function Dashboard() {
 
     setPaddockCount(count || 0)
 
+    // Fetch alive animals grouped by mob for accurate counts
+    const mobNames = (mobsData || []).map((m) => m.name)
+    const { data: animalsData } = mobNames.length > 0
+      ? await supabase
+          .from('animals')
+          .select('mob_name, cattle_type')
+          .in('mob_name', mobNames)
+          .eq('status', 'alive')
+      : { data: [] }
+
+    // Build per-mob animal counts
+    const animalsByMob = {}
+    ;(animalsData || []).forEach((a) => {
+      if (!animalsByMob[a.mob_name]) animalsByMob[a.mob_name] = {}
+      animalsByMob[a.mob_name][a.cattle_type] = (animalsByMob[a.mob_name][a.cattle_type] || 0) + 1
+    })
+
     const activeMap = {}
     if (activeMovements) {
       activeMovements.forEach((m) => { activeMap[m.mob_name] = m })
@@ -97,7 +114,14 @@ function Dashboard() {
     }
 
     const enriched = (mobsData || []).map((mob) => {
-      const headCount = (mob.mob_composition || []).reduce((sum, c) => sum + c.count, 0)
+      const mobAnimals = animalsByMob[mob.name]
+      const hasAnimals = mobAnimals && Object.keys(mobAnimals).length > 0
+      const headCount = hasAnimals
+        ? Object.values(mobAnimals).reduce((sum, c) => sum + c, 0)
+        : (mob.mob_composition || []).reduce((sum, c) => sum + c.count, 0)
+      const derivedComposition = hasAnimals
+        ? Object.entries(mobAnimals).map(([cattle_type, count]) => ({ cattle_type, count }))
+        : (mob.mob_composition || [])
       const activeMove = activeMap[mob.name]
       const plannedMove = plannedMap[mob.name]
       const daysUntilMove = plannedMove?.planned_move_in_date
@@ -106,6 +130,7 @@ function Dashboard() {
       return {
         ...mob,
         headCount,
+        derivedComposition,
         currentPaddock: activeMove?.paddock_name || null,
         daysUntilMove,
         nextPaddock: plannedMove?.paddock_name || null,
@@ -142,7 +167,7 @@ function Dashboard() {
 
   const totalsByType = {}
   mobs.forEach((mob) => {
-    (mob.mob_composition || []).forEach((c) => {
+    (mob.derivedComposition || []).forEach((c) => {
       totalsByType[c.cattle_type] = (totalsByType[c.cattle_type] || 0) + c.count
     })
   })
@@ -191,9 +216,9 @@ function Dashboard() {
                 </h3>
                 <div style={{ textAlign: 'right' }}>
                   <span className="head-badge">{mob.headCount} hd</span>
-                  {mob.mob_composition && mob.mob_composition.length > 0 && (
+                  {mob.derivedComposition && mob.derivedComposition.length > 0 && (
                     <div className="head-comp-line">
-                      {mob.mob_composition
+                      {mob.derivedComposition
                         .filter((c) => c.count > 0)
                         .map((c) => `${c.count} ${c.count !== 1 && c.cattle_type === 'calf' ? 'calves' : c.count !== 1 ? c.cattle_type + 's' : c.cattle_type}`)
                         .join(', ')}

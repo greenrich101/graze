@@ -144,8 +144,20 @@ function MobDetail() {
     setLoadingHealth(false)
   }
 
-  // Calculate head count from animals table (new system) or fallback to composition (legacy)
-  const headCount = animals.length > 0 ? animals.length : composition.reduce((sum, c) => sum + c.count, 0)
+  // When individual animals exist, derive head count and composition from them (source of truth)
+  // Otherwise fall back to manually-entered mob_composition (legacy)
+  const hasAnimals = animals.length > 0
+  const headCount = hasAnimals ? animals.length : composition.reduce((sum, c) => sum + c.count, 0)
+
+  // Derive composition from animals table when available
+  const derivedComposition = hasAnimals
+    ? Object.entries(
+        animals.reduce((acc, a) => {
+          acc[a.cattle_type] = (acc[a.cattle_type] || 0) + 1
+          return acc
+        }, {})
+      ).map(([cattle_type, count]) => ({ cattle_type, count }))
+    : composition
   const daysUntilMove = plannedMovement?.planned_move_in_date
     ? Math.max(0, Math.ceil((new Date(plannedMovement.planned_move_in_date + 'T00:00').getTime() - Date.now()) / 86400000))
     : null
@@ -303,11 +315,11 @@ function MobDetail() {
           )}
           <div className="detail-item">
             <span className="detail-label">Composition</span>
-            {composition.length === 0 ? (
+            {derivedComposition.length === 0 ? (
               <span className="detail-value muted">No composition set</span>
             ) : (
               <div className="comp-summary">
-                {composition.map((c) => (
+                {derivedComposition.map((c) => (
                   <span key={c.cattle_type} className="comp-tag">
                     {c.count} {c.cattle_type}
                   </span>

@@ -37,6 +37,22 @@ function Mobs() {
       return
     }
 
+    // Fetch alive animals grouped by mob for accurate counts
+    const mobNames = (data || []).map((m) => m.name)
+    const { data: animalsData } = mobNames.length > 0
+      ? await supabase
+          .from('animals')
+          .select('mob_name, cattle_type')
+          .in('mob_name', mobNames)
+          .eq('status', 'alive')
+      : { data: [] }
+
+    const animalsByMob = {}
+    ;(animalsData || []).forEach((a) => {
+      if (!animalsByMob[a.mob_name]) animalsByMob[a.mob_name] = {}
+      animalsByMob[a.mob_name][a.cattle_type] = (animalsByMob[a.mob_name][a.cattle_type] || 0) + 1
+    })
+
     // Fetch active movements to get current paddock info
     const { data: openMovements } = await supabase
       .from('movements')
@@ -52,7 +68,11 @@ function Mobs() {
     }
 
     const enriched = (data || []).map((mob) => {
-      const headCount = (mob.mob_composition || []).reduce((sum, c) => sum + c.count, 0)
+      const mobAnimals = animalsByMob[mob.name]
+      const hasAnimals = mobAnimals && Object.keys(mobAnimals).length > 0
+      const headCount = hasAnimals
+        ? Object.values(mobAnimals).reduce((sum, c) => sum + c, 0)
+        : (mob.mob_composition || []).reduce((sum, c) => sum + c.count, 0)
       const openMove = movementMap[mob.name]
       const daysGrazing = openMove
         ? Math.floor((Date.now() - new Date(openMove.actual_move_in_date).getTime()) / 86400000)
