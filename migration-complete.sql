@@ -187,8 +187,6 @@ BEGIN
   VALUES (p_mob_name, p_cattle_type, p_nlis_tag, p_management_tag, p_breed, p_birth_date, p_description, 'alive')
   RETURNING id INTO new_animal_id;
 
-  PERFORM sync_mob_composition(p_mob_name);
-
   RETURN new_animal_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -222,8 +220,6 @@ BEGIN
     INSERT INTO animals (mob_name, cattle_type, breed, birth_date, description, status)
     VALUES (p_mob_name, p_cattle_type, p_breed, p_birth_date, p_description, 'alive');
   END LOOP;
-
-  PERFORM sync_mob_composition(p_mob_name);
 
   RETURN p_count;
 END;

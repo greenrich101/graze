@@ -81,9 +81,6 @@ function AnimalList({ animals, onRefresh, isHand }) {
       return
     }
 
-    const mobName = animals[0]?.mob_name
-    if (mobName) await supabase.rpc('sync_mob_composition', { p_mob_name: mobName })
-
     setEditingAnimal(null)
     setEditForm({})
     setSaving(false)
@@ -103,8 +100,6 @@ function AnimalList({ animals, onRefresh, isHand }) {
       setError(deleteErr.message)
       return
     }
-
-    if (animal?.mob_name) await supabase.rpc('sync_mob_composition', { p_mob_name: animal.mob_name })
 
     onRefresh()
   }
