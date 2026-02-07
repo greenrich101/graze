@@ -6,6 +6,7 @@ export default function AnimalLookup({ propertyId }) {
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [animal, setAnimal] = useState(null)
+  const [currentPaddock, setCurrentPaddock] = useState(null)
   const [movements, setMovements] = useState([])
   const [treatments, setTreatments] = useState([])
   const [searched, setSearched] = useState(false)
@@ -17,6 +18,7 @@ export default function AnimalLookup({ propertyId }) {
 
     setSearching(true)
     setAnimal(null)
+    setCurrentPaddock(null)
     setMovements([])
     setTreatments([])
     setSearched(true)
@@ -49,6 +51,17 @@ export default function AnimalLookup({ propertyId }) {
 
     setAnimal(animals)
 
+    // Fetch current paddock (active movement with no move-out date)
+    const { data: activeMove } = await supabase
+      .from('movements')
+      .select('paddock_name')
+      .eq('mob_name', animals.mob_name)
+      .not('actual_move_in_date', 'is', null)
+      .is('actual_move_out_date', null)
+      .single()
+
+    setCurrentPaddock(activeMove?.paddock_name || null)
+
     // Fetch last 3 movements for this animal's mob
     const { data: movData } = await supabase
       .from('movements')
@@ -75,6 +88,7 @@ export default function AnimalLookup({ propertyId }) {
   const handleClear = () => {
     setQuery('')
     setAnimal(null)
+    setCurrentPaddock(null)
     setMovements([])
     setTreatments([])
     setSearched(false)
@@ -139,6 +153,16 @@ export default function AnimalLookup({ propertyId }) {
                   <Link to={`/mobs/${encodeURIComponent(animal.mob_name)}`}>
                     {animal.mob_name}
                   </Link>
+                </span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Current Paddock</span>
+                <span className="detail-value">
+                  {currentPaddock ? (
+                    <Link to={`/paddocks/${encodeURIComponent(currentPaddock)}`}>
+                      {currentPaddock}
+                    </Link>
+                  ) : '—'}
                 </span>
               </div>
               <div className="detail-item">
