@@ -101,7 +101,24 @@ CREATE INDEX IF NOT EXISTS animals_cattle_type_idx
   ON animals(cattle_type);
 
 -- ============================================================
--- 7. RPC: Add individual animal
+-- 7a. RPC: Sync mob_composition from animals table
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION sync_mob_composition(p_mob_name TEXT)
+RETURNS void AS $$
+BEGIN
+  DELETE FROM mob_composition WHERE mob_name = p_mob_name;
+
+  INSERT INTO mob_composition (mob_name, cattle_type, count)
+  SELECT mob_name, cattle_type, COUNT(*)
+  FROM animals
+  WHERE mob_name = p_mob_name AND status = 'alive'
+  GROUP BY mob_name, cattle_type;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================
+-- 7b. RPC: Add individual animal
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION add_animal(
@@ -136,6 +153,8 @@ BEGIN
   INSERT INTO animals (mob_name, cattle_type, nlis_tag, management_tag, breed, birth_date, description, status)
   VALUES (p_mob_name, p_cattle_type, p_nlis_tag, p_management_tag, p_breed, p_birth_date, p_description, 'alive')
   RETURNING id INTO new_animal_id;
+
+  PERFORM sync_mob_composition(p_mob_name);
 
   RETURN new_animal_id;
 END;
@@ -177,6 +196,8 @@ BEGIN
     INSERT INTO animals (mob_name, cattle_type, breed, birth_date, description, status)
     VALUES (p_mob_name, p_cattle_type, p_breed, p_birth_date, p_description, 'alive');
   END LOOP;
+
+  PERFORM sync_mob_composition(p_mob_name);
 
   RETURN p_count;
 END;
