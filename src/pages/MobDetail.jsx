@@ -34,6 +34,7 @@ function MobDetail() {
   const [addMode, setAddMode] = useState('form') // 'form' or 'csv'
   const [healthEvents, setHealthEvents] = useState([])
   const [loadingHealth, setLoadingHealth] = useState(true)
+  const [deletingAllAnimals, setDeletingAllAnimals] = useState(false)
 
   useEffect(() => {
     fetchMob()
@@ -210,6 +211,24 @@ function MobDetail() {
       setError(updErr.message)
       return
     }
+    fetchMob()
+  }
+
+  const handleDeleteAllAnimals = async () => {
+    if (!confirm(`Delete all ${animals.length} individual animals from this mob? This cannot be undone. Composition will be cleared.`)) return
+    setDeletingAllAnimals(true)
+    setError('')
+    const { error: delErr } = await supabase
+      .from('animals')
+      .delete()
+      .eq('mob_name', decodedName)
+    if (delErr) {
+      setError(delErr.message)
+      setDeletingAllAnimals(false)
+      return
+    }
+    await supabase.rpc('sync_mob_composition', { p_mob_name: decodedName })
+    setDeletingAllAnimals(false)
     fetchMob()
   }
 
@@ -437,14 +456,25 @@ function MobDetail() {
       <div className="detail-card">
         <div className="detail-card-header">
           <h3>Individual Animals</h3>
-          {!isHand && (
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={() => setShowAddAnimal(!showAddAnimal)}
-            >
-              {showAddAnimal ? 'Cancel' : 'Update Data'}
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {!isHand && animals.length > 0 && (
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={handleDeleteAllAnimals}
+                disabled={deletingAllAnimals}
+              >
+                {deletingAllAnimals ? 'Deleting...' : 'Delete All'}
+              </button>
+            )}
+            {!isHand && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setShowAddAnimal(!showAddAnimal)}
+              >
+                {showAddAnimal ? 'Cancel' : 'Update Data'}
+              </button>
+            )}
+          </div>
         </div>
         {showAddAnimal && (
           <div>
