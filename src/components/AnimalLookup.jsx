@@ -101,7 +101,7 @@ export default function AnimalLookup({ propertyId }) {
         Search by Management Tag or NLIS tag.
       </p>
 
-      <form onSubmit={handleSearch} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+      <form onSubmit={handleSearch} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', maxWidth: '480px' }}>
         <input
           type="text"
           value={query}
