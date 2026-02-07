@@ -146,6 +146,8 @@ function MobDetail() {
   }
 
   const headCount = composition.reduce((sum, c) => sum + c.count, 0)
+  const animalCount = animals.length
+  const compositionMismatch = animalCount > 0 && headCount !== animalCount
   const daysUntilMove = plannedMovement?.planned_move_in_date
     ? Math.max(0, Math.ceil((new Date(plannedMovement.planned_move_in_date + 'T00:00').getTime() - Date.now()) / 86400000))
     : null
@@ -215,7 +217,7 @@ function MobDetail() {
   }
 
   const handleDeleteAllAnimals = async () => {
-    if (!confirm(`Delete all ${animals.length} individual animals from this mob? This cannot be undone. Composition will be cleared.`)) return
+    if (!confirm(`Delete all ${animals.length} individual animals from this mob? This cannot be undone.`)) return
     setDeletingAllAnimals(true)
     setError('')
     const { error: delErr } = await supabase
@@ -227,7 +229,6 @@ function MobDetail() {
       setDeletingAllAnimals(false)
       return
     }
-    await supabase.rpc('sync_mob_composition', { p_mob_name: decodedName })
     setDeletingAllAnimals(false)
     fetchMob()
   }
@@ -333,6 +334,11 @@ function MobDetail() {
               </div>
             )}
           </div>
+          {compositionMismatch && (
+            <p className="warning-message" style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
+              Composition ({headCount}) does not match individual animals ({animalCount})
+            </p>
+          )}
         </div>
         {editingComp && (
           <div style={{ marginTop: '0.75rem' }}>
