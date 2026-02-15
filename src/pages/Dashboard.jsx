@@ -1,10 +1,26 @@
-import { useState, useEffect } from 'react'
+import { Component, useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useProperty } from '../contexts/PropertyContext'
 import GenerateReport from '../components/GenerateReport'
 import AnimalLookup from '../components/AnimalLookup'
 import MarketPrices from '../components/MarketPrices'
+
+class MarketWrapper extends Component {
+  constructor(props) { super(props); this.state = { crashed: false } }
+  static getDerivedStateFromError() { return { crashed: true } }
+  render() {
+    if (this.state.crashed) {
+      return (
+        <div className="detail-card">
+          <h3>Markets</h3>
+          <p className="muted">Markets temporarily unavailable.</p>
+        </div>
+      )
+    }
+    return <MarketPrices />
+  }
+}
 
 function Dashboard() {
   const { propertyId } = useProperty()
@@ -322,7 +338,7 @@ function Dashboard() {
 
       <GenerateReport propertyId={propertyId} />
       <AnimalLookup propertyId={propertyId} />
-      <MarketPrices />
+      <MarketWrapper />
     </div>
   )
 }
