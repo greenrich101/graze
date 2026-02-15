@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useProperty } from '../contexts/PropertyContext'
 import GenerateReport from '../components/GenerateReport'
 import AnimalLookup from '../components/AnimalLookup'
+import MarketPrices from '../components/MarketPrices'
 
 function Dashboard() {
   const { propertyId } = useProperty()
@@ -321,6 +322,7 @@ function Dashboard() {
 
       <GenerateReport propertyId={propertyId} />
       <AnimalLookup propertyId={propertyId} />
+      <MarketPrices />
     </div>
   )
 }
