@@ -1,4 +1,21 @@
-import { useEffect, useState } from 'react'
+import { Component, useEffect, useState } from 'react'
+
+class MarketErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { crashed: false } }
+  static getDerivedStateFromError() { return { crashed: true } }
+  componentDidCatch(e) { console.log('[MarketPrices] render error:', e) }
+  render() {
+    if (this.state.crashed) {
+      return (
+        <div className="detail-card">
+          <h3>Markets</h3>
+          <p className="muted">Markets data unavailable.</p>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -16,34 +33,65 @@ function ChangeValue({ pct }) {
   return <span className={`detail-value ${cls}`}>{sign}{fmt(pct)}%</span>
 }
 
-function fmtHead(value) {
-  if (value === null || value === undefined) return '—'
-  return Number(value).toLocaleString()
+
+function cohortLabel(c) {
+  if (!c?.category) return 'Unknown'
+  const name = c.category.charAt(0).toUpperCase() + c.category.slice(1) + 's'
+  if (c.weight_max === null) return `${name} ${c.weight_min}kg+`
+  return `${name} ${c.weight_min}–${c.weight_max}kg`
 }
 
 function SaleyardBlock({ saleyard }) {
+  const sales = saleyard.sales ?? []
+  if (sales.length === 0) {
+    return (
+      <div className="market-saleyard-block">
+        <div className="market-section-label">{saleyard.label}</div>
+        <p className="muted">No recent sale data.</p>
+      </div>
+    )
+  }
+
+  const latest = sales[0]
+
+  // Rolling average across all available sales per cohort
+  const avgMap = {}
+  const countMap = {}
+  sales.forEach(sale => {
+    (sale.cohorts ?? []).forEach(c => {
+      const key = `${c.category}:${c.weight_min}:${c.weight_max}`
+      avgMap[key] = (avgMap[key] || 0) + c.avg_c_kg
+      countMap[key] = (countMap[key] || 0) + 1
+    })
+  })
+
   return (
     <div className="market-saleyard-block">
-      <div className="market-section-label">{saleyard.label} <span className="market-section-qualifier">national indicator, {saleyard.label.split(' ')[0]}-weighted</span></div>
+      <div className="market-section-label">
+        {saleyard.label}
+        <span className="market-section-qualifier"> · {latest.sale_date}{latest.total_head ? ` · ${latest.total_head.toLocaleString()} head` : ''}</span>
+      </div>
       <div className="market-saleyard-header">
         <span>Category</span>
-        <span>Current ({saleyard.units})</span>
-        <span>4wk avg</span>
-        <span>Head contrib.</span>
+        <span>Avg c/kg</span>
+        <span>{sales.length > 1 ? `${sales.length}-sale avg` : '—'}</span>
       </div>
-      {saleyard.categories.map((cat) => (
-        <div key={cat.label} className="market-saleyard-row">
-          <span className="market-cat-name">{cat.label}</span>
-          <span className="market-price">{fmt(cat.currentWeek)}</span>
-          <span className="market-avg muted">{fmt(cat.avg4w)}</span>
-          <span className="market-head muted">{fmtHead(cat.headThisWeek)}</span>
-        </div>
-      ))}
+      {(latest.cohorts ?? []).map((c) => {
+        const key = `${c.category}:${c.weight_min}:${c.weight_max}`
+        const rollingAvg = countMap[key] > 1 ? avgMap[key] / countMap[key] : null
+        return (
+          <div key={key} className="market-saleyard-row">
+            <span className="market-cat-name">{cohortLabel(c)}</span>
+            <span className="market-price">{fmt(c.avg_c_kg)}</span>
+            <span className="market-avg muted">{rollingAvg !== null ? fmt(rollingAvg) : '—'}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }
 
-export default function MarketPrices() {
+function MarketPricesInner() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -54,8 +102,13 @@ export default function MarketPrices() {
         const res = await fetch(`${SUPABASE_URL}/functions/v1/market-prices`, {
           headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
         })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        setData(await res.json())
+        const json = await res.json().catch(() => null)
+        console.log('[MarketPrices] response:', res.status, json)
+        if (!res.ok || !json || typeof json !== 'object') {
+          setError(`HTTP ${res.status}`)
+          return
+        }
+        setData(json)
       } catch (e) {
         setError(e.message)
       } finally {
@@ -69,17 +122,20 @@ export default function MarketPrices() {
     ? new Date(data.fetchedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
     : null
 
+  if (!loading && (error || !data)) {
+    return (
+      <div className="detail-card">
+        <h3>Markets</h3>
+        <p className="muted">Markets data unavailable.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="detail-card">
       <h3>Markets</h3>
 
       {loading && <p className="muted">Loading market prices…</p>}
-
-      {error && (
-        <p className="muted" style={{ color: 'var(--danger)' }}>
-          Unable to load market data. ({error})
-        </p>
-      )}
 
       {data && (
         <>
@@ -119,5 +175,13 @@ export default function MarketPrices() {
         </>
       )}
     </div>
+  )
+}
+
+export default function MarketPrices() {
+  return (
+    <MarketErrorBoundary>
+      <MarketPricesInner />
+    </MarketErrorBoundary>
   )
 }
