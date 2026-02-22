@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useProperty } from '../contexts/PropertyContext'
+import { EXECUTE_CONDITION_OPTIONS, CONDITION_NOT_MEASURED } from '../lib/constants'
 import MovementList from '../components/MovementList'
 import AnimalList from '../components/AnimalList'
 import AddAnimalForm from '../components/AddAnimalForm'
@@ -29,6 +30,8 @@ function MobDetail() {
   const [cancelling, setCancelling] = useState(false)
   const [showExecuteForm, setShowExecuteForm] = useState(false)
   const [executeDate, setExecuteDate] = useState(new Date().toISOString().split('T')[0])
+  const [exitCondition, setExitCondition] = useState(CONDITION_NOT_MEASURED)
+  const [entryCondition, setEntryCondition] = useState(CONDITION_NOT_MEASURED)
   const [animals, setAnimals] = useState([])
   const [showAddAnimal, setShowAddAnimal] = useState(false)
   const [addMode, setAddMode] = useState('form') // 'form' or 'csv'
@@ -184,7 +187,22 @@ function MobDetail() {
       setExecuting(false)
       return
     }
+
+    const logInserts = []
+    if (exitCondition !== CONDITION_NOT_MEASURED && openMovement?.paddock_name) {
+      logInserts.push({ property_id: propertyId, paddock_name: openMovement.paddock_name, log_date: executeDate, condition: exitCondition })
+    }
+    if (entryCondition !== CONDITION_NOT_MEASURED && plannedMovement?.paddock_name) {
+      logInserts.push({ property_id: propertyId, paddock_name: plannedMovement.paddock_name, log_date: executeDate, condition: entryCondition })
+    }
+    if (logInserts.length > 0) {
+      const { error: logErr } = await supabase.from('pasture_logs').insert(logInserts)
+      if (logErr) console.error('Pasture log insert failed:', logErr.message)
+    }
+
     setExecuting(false)
+    setExitCondition(CONDITION_NOT_MEASURED)
+    setEntryCondition(CONDITION_NOT_MEASURED)
     setShowExecuteForm(false)
     fetchMob()
   }
@@ -395,6 +413,8 @@ function MobDetail() {
                 className="btn btn-primary"
                 onClick={() => {
                   setExecuteDate(new Date().toISOString().split('T')[0])
+                  setExitCondition(CONDITION_NOT_MEASURED)
+                  setEntryCondition(CONDITION_NOT_MEASURED)
                   setShowExecuteForm(true)
                 }}
               >
@@ -422,10 +442,40 @@ function MobDetail() {
                   Use today for current moves, or select a past date for retrospective moves
                 </p>
               </div>
+              {openMovement?.paddock_name && (
+                <div className="form-group">
+                  <label>Condition: {openMovement.paddock_name} (exit)</label>
+                  <select
+                    value={exitCondition}
+                    onChange={(e) => setExitCondition(e.target.value)}
+                  >
+                    {EXECUTE_CONDITION_OPTIONS.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {plannedMovement?.paddock_name && (
+                <div className="form-group">
+                  <label>Condition: {plannedMovement.paddock_name} (entry)</label>
+                  <select
+                    value={entryCondition}
+                    onChange={(e) => setEntryCondition(e.target.value)}
+                  >
+                    {EXECUTE_CONDITION_OPTIONS.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="form-actions">
                 <button
                   className="btn btn-secondary"
-                  onClick={() => setShowExecuteForm(false)}
+                  onClick={() => {
+                    setExitCondition(CONDITION_NOT_MEASURED)
+                    setEntryCondition(CONDITION_NOT_MEASURED)
+                    setShowExecuteForm(false)
+                  }}
                   disabled={executing}
                 >
                   Cancel

@@ -100,17 +100,27 @@ function Mobs() {
   }
 
   const handleUpdate = async (mob) => {
+    const oldName = mob.originalName || mob.name
+    const nameChanging = mob.name !== oldName
+
     const { error } = await supabase
       .from('mobs')
       .update({
         name: mob.name,
         description: mob.description,
       })
-      .eq('name', mob.originalName || mob.name)
+      .eq('name', oldName)
+      .eq('property_id', propertyId)
 
     if (error) {
       setError(error.message)
       return false
+    }
+
+    // Cascade name change to non-FK tables (mob_composition and movements use mob_name as plain text)
+    if (nameChanging) {
+      await supabase.from('mob_composition').update({ mob_name: mob.name }).eq('mob_name', oldName)
+      await supabase.from('movements').update({ mob_name: mob.name }).eq('mob_name', oldName)
     }
 
     setEditingMob(null)

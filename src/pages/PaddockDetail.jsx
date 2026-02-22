@@ -3,8 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useProperty } from '../contexts/PropertyContext'
 import MovementList from '../components/MovementList'
-
-const CONDITION_OPTIONS = ['Poor', 'Fair', 'Good', 'Excellent']
+import { CONDITION_OPTIONS } from '../lib/constants'
 
 function PaddockDetail() {
   const { paddockName } = useParams()

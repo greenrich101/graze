@@ -2,9 +2,11 @@ import { Component, useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useProperty } from '../contexts/PropertyContext'
+import { EXECUTE_CONDITION_OPTIONS, CONDITION_NOT_MEASURED } from '../lib/constants'
 import GenerateReport from '../components/GenerateReport'
-import AnimalLookup from '../components/AnimalLookup'
+import UniversalSearch from '../components/UniversalSearch'
 import MarketPrices from '../components/MarketPrices'
+import MobForm from '../components/MobForm'
 
 class MarketWrapper extends Component {
   constructor(props) { super(props); this.state = { crashed: false } }
@@ -31,6 +33,9 @@ function Dashboard() {
   const [executingMob, setExecutingMob] = useState(null) // mob name being executed
   const [executeDate, setExecuteDate] = useState(new Date().toISOString().split('T')[0])
   const [executing, setExecuting] = useState(false)
+  const [exitCondition, setExitCondition] = useState(CONDITION_NOT_MEASURED)
+  const [entryCondition, setEntryCondition] = useState(CONDITION_NOT_MEASURED)
+  const [editingMob, setEditingMob] = useState(null)
 
   useEffect(() => {
     if (!propertyId) return
@@ -150,9 +155,50 @@ function Dashboard() {
       setExecuting(false)
       return
     }
+
+    const mob = mobs.find((m) => m.name === executingMob)
+    const logInserts = []
+    if (exitCondition !== CONDITION_NOT_MEASURED && mob?.currentPaddock) {
+      logInserts.push({ property_id: propertyId, paddock_name: mob.currentPaddock, log_date: executeDate, condition: exitCondition })
+    }
+    if (entryCondition !== CONDITION_NOT_MEASURED && mob?.nextPaddock) {
+      logInserts.push({ property_id: propertyId, paddock_name: mob.nextPaddock, log_date: executeDate, condition: entryCondition })
+    }
+    if (logInserts.length > 0) {
+      const { error: logErr } = await supabase.from('pasture_logs').insert(logInserts)
+      if (logErr) console.error('Pasture log insert failed:', logErr.message)
+    }
+
     setExecuting(false)
+    setExitCondition(CONDITION_NOT_MEASURED)
+    setEntryCondition(CONDITION_NOT_MEASURED)
     setExecutingMob(null)
     fetchDashboard()
+  }
+
+  const handleMobUpdate = async (mob) => {
+    const oldName = mob.originalName || mob.name
+    const nameChanging = mob.name !== oldName
+
+    const { error: updateErr } = await supabase
+      .from('mobs')
+      .update({ name: mob.name, description: mob.description })
+      .eq('name', oldName)
+      .eq('property_id', propertyId)
+
+    if (updateErr) {
+      setError(updateErr.message)
+      return false
+    }
+
+    if (nameChanging) {
+      await supabase.from('mob_composition').update({ mob_name: mob.name }).eq('mob_name', oldName)
+      await supabase.from('movements').update({ mob_name: mob.name }).eq('mob_name', oldName)
+    }
+
+    setEditingMob(null)
+    fetchDashboard()
+    return true
   }
 
   const totalHead = mobs.reduce((s, m) => s + m.headCount, 0)
@@ -196,6 +242,14 @@ function Dashboard() {
         </div>
       </div>
 
+      {editingMob && (
+        <MobForm
+          mob={editingMob}
+          onSubmit={handleMobUpdate}
+          onCancel={() => setEditingMob(null)}
+        />
+      )}
+
       {/* Mob cards */}
       {mobs.length === 0 ? (
         <p className="empty-state">No mobs yet. <Link to="/mobs">Add your first mob</Link>.</p>
@@ -206,6 +260,13 @@ function Dashboard() {
               <div className="dashboard-card-header">
                 <h3>
                   <Link to={`/mobs/${encodeURIComponent(mob.name)}`}>{mob.name}</Link>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ marginLeft: '0.5rem', fontSize: '0.75rem', padding: '0.1rem 0.5rem' }}
+                    onClick={() => setEditingMob(mob)}
+                  >
+                    Edit
+                  </button>
                 </h3>
                 <div style={{ textAlign: 'right' }}>
                   <span className="head-badge">{mob.headCount} hd</span>
@@ -281,6 +342,8 @@ function Dashboard() {
                     className="btn btn-primary btn-sm"
                     onClick={() => {
                       setExecuteDate(new Date().toISOString().split('T')[0])
+                      setExitCondition(CONDITION_NOT_MEASURED)
+                      setEntryCondition(CONDITION_NOT_MEASURED)
                       setExecutingMob(mob.name)
                     }}
                   >
@@ -302,10 +365,46 @@ function Dashboard() {
                         Today for current moves, or past date for retrospective
                       </p>
                     </div>
+                    {mob.currentPaddock && (
+                      <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+                        <label style={{ fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                          Condition: {mob.currentPaddock} (exit)
+                        </label>
+                        <select
+                          value={exitCondition}
+                          onChange={(e) => setExitCondition(e.target.value)}
+                          style={{ width: '100%' }}
+                        >
+                          {EXECUTE_CONDITION_OPTIONS.map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {mob.nextPaddock && (
+                      <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+                        <label style={{ fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                          Condition: {mob.nextPaddock} (entry)
+                        </label>
+                        <select
+                          value={entryCondition}
+                          onChange={(e) => setEntryCondition(e.target.value)}
+                          style={{ width: '100%' }}
+                        >
+                          {EXECUTE_CONDITION_OPTIONS.map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button
                         className="btn btn-secondary btn-sm"
-                        onClick={() => setExecutingMob(null)}
+                        onClick={() => {
+                          setExitCondition(CONDITION_NOT_MEASURED)
+                          setEntryCondition(CONDITION_NOT_MEASURED)
+                          setExecutingMob(null)
+                        }}
                         disabled={executing}
                         style={{ flex: 1 }}
                       >
@@ -337,7 +436,7 @@ function Dashboard() {
       )}
 
       <GenerateReport propertyId={propertyId} />
-      <AnimalLookup propertyId={propertyId} />
+      <UniversalSearch propertyId={propertyId} />
       <MarketWrapper />
     </div>
   )
