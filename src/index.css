@@ -1546,3 +1546,98 @@ body {
   color: var(--danger);
   font-weight: 600;
 }
+
+.market-compare-block {
+  background: var(--gray-100);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+}
+
+.market-compare-header {
+  display: grid;
+  grid-template-columns: 1fr repeat(var(--sy-cols, 3), 4rem);
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--gray-600);
+  font-weight: 600;
+  padding: 0.5rem 0.25rem;
+  border-bottom: 1px solid var(--gray-300);
+}
+
+.market-compare-header span:not(:first-child) {
+  text-align: right;
+}
+
+.market-compare-group {
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.market-compare-group:last-child {
+  border-bottom: none;
+}
+
+.market-compare-row {
+  display: grid;
+  grid-template-columns: 1fr repeat(var(--sy-cols, 3), 4rem);
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem 0.25rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  align-items: center;
+  font: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.market-compare-row:hover,
+.market-compare-row:focus-visible {
+  background: var(--gray-200);
+  border-radius: 4px;
+  outline: none;
+}
+
+.market-compare-row.open {
+  background: var(--gray-200);
+  border-radius: 4px 4px 0 0;
+}
+
+.market-compare-caret {
+  display: inline-block;
+  width: 0.9rem;
+  color: var(--gray-600);
+  font-size: 0.8rem;
+}
+
+.market-best {
+  color: var(--primary);
+}
+
+.market-compare-history {
+  padding: 0.4rem 0.25rem 0.6rem 1.5rem;
+  background: var(--gray-200);
+  border-radius: 0 0 4px 4px;
+}
+
+.market-compare-history-row {
+  display: grid;
+  grid-template-columns: 1fr repeat(var(--sy-cols, 3), 4rem);
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  font-size: 0.8rem;
+}
+
+.market-compare-history-date {
+  color: var(--gray-600);
+  font-variant-numeric: tabular-nums;
+}
+
+.market-compare-history-val {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
