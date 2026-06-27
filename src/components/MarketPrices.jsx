@@ -60,116 +60,6 @@ function cohortKey(c) {
   return `${c?.category}:${c?.weight_min}:${c?.weight_max}`
 }
 
-const INDICATOR_ORDER = [
-  'Restocker Steer', 'Feeder Steer', 'Heavy Steer',
-  'Restocker Heifer', 'Feeder Heifer', 'Processor Cow',
-]
-
-function shortSaleyard(label) {
-  if (!label) return ''
-  return label.replace(/\s+Store$/, '')
-}
-
-function getLatestForIndicator(saleyard, label) {
-  const sales = Array.isArray(saleyard?.sales) ? saleyard.sales : []
-  for (const sale of sales) {
-    const c = Array.isArray(sale?.cohorts) ? sale.cohorts.find(c => c?.indicator_label === label) : null
-    if (c) return { value: c.avg_c_kg, date: sale.sale_date, head: c.head }
-  }
-  return null
-}
-
-function ComparisonHistory({ label, saleyards }) {
-  const allDates = new Set()
-  saleyards.forEach(sy => {
-    const sales = Array.isArray(sy?.sales) ? sy.sales : []
-    sales.forEach(s => {
-      const has = Array.isArray(s?.cohorts) && s.cohorts.some(c => c?.indicator_label === label)
-      if (has && s?.sale_date) allDates.add(s.sale_date)
-    })
-  })
-  const dates = [...allDates].sort().reverse()
-  if (dates.length === 0) return null
-
-  return (
-    <div className="market-compare-history">
-      {dates.map(date => (
-        <div key={date} className="market-compare-history-row" style={{ '--sy-cols': saleyards.length }}>
-          <span className="market-compare-history-date">{date}</span>
-          {saleyards.map(sy => {
-            const sale = sy?.sales?.find(s => s?.sale_date === date)
-            const c = sale?.cohorts?.find(c => c?.indicator_label === label)
-            return (
-              <span key={sy.id} className="market-compare-history-val">
-                {c ? fmt(c.avg_c_kg) : '—'}
-              </span>
-            )
-          })}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function ComparisonTable({ saleyards }) {
-  const [expanded, setExpanded] = useState(null)
-
-  if (!Array.isArray(saleyards) || saleyards.length === 0) return null
-
-  const labelsPresent = new Set()
-  saleyards.forEach(sy => {
-    const latest = sy?.sales?.[0]
-    if (!latest) return
-    const cohorts = Array.isArray(latest.cohorts) ? latest.cohorts : []
-    cohorts.forEach(c => { if (c?.indicator_label) labelsPresent.add(c.indicator_label) })
-  })
-  const labels = INDICATOR_ORDER.filter(l => labelsPresent.has(l))
-  if (labels.length === 0) return null
-
-  return (
-    <div className="market-compare-block">
-      <div className="market-section-label">
-        Cross-saleyard comparison
-        <span className="market-section-qualifier"> · tap a row to see history</span>
-      </div>
-      <div className="market-compare-header" style={{ '--sy-cols': saleyards.length }}>
-        <span>Indicator</span>
-        {saleyards.map(sy => <span key={sy.id}>{shortSaleyard(sy?.label)}</span>)}
-      </div>
-      {labels.map(label => {
-        const values = saleyards.map(sy => getLatestForIndicator(sy, label))
-        const nums = values.map(v => v?.value).filter(v => typeof v === 'number')
-        const max = nums.length > 1 ? Math.max(...nums) : null
-        const isOpen = expanded === label
-        return (
-          <div key={label} className="market-compare-group">
-            <button
-              type="button"
-              className={`market-compare-row${isOpen ? ' open' : ''}`}
-              style={{ '--sy-cols': saleyards.length }}
-              onClick={() => setExpanded(isOpen ? null : label)}
-              aria-expanded={isOpen}
-            >
-              <span className="market-cat-name">
-                <span className="market-compare-caret" aria-hidden="true">{isOpen ? '▾' : '▸'}</span> {label}
-              </span>
-              {values.map((v, i) => (
-                <span
-                  key={saleyards[i].id}
-                  className={`market-price${max !== null && v?.value === max ? ' market-best' : ''}`}
-                >
-                  {v ? fmt(v.value) : '—'}
-                </span>
-              ))}
-            </button>
-            {isOpen && <ComparisonHistory label={label} saleyards={saleyards} />}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 function SaleyardBlock({ saleyard }) {
   try {
     const sales = Array.isArray(saleyard?.sales) ? saleyard.sales : []
@@ -314,8 +204,6 @@ function MarketPricesInner() {
           {saleyards.map((sy) => (
             <SaleyardBlock key={sy?.id ?? sy?.label} saleyard={sy} />
           ))}
-
-          <ComparisonTable saleyards={saleyards} />
 
           {DEBUG && rawDebug && (
             <pre style={{ fontSize: '0.7rem', whiteSpace: 'pre-wrap', marginTop: '1rem', background: '#f4f4f4', padding: '0.5rem', borderRadius: '4px' }}>
