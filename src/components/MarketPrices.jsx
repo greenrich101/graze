@@ -46,38 +46,28 @@ function ChangeValue({ pct }) {
 
 function cohortLabel(c) {
   try {
-    if (!c || !c.category) return 'Unknown'
+    if (!c) return 'Unknown'
+    if (c.indicator_label) return c.indicator_label
+    if (!c.category) return 'Unknown'
     const name = c.category.charAt(0).toUpperCase() + c.category.slice(1) + 's'
     if (c.weight_max === null || c.weight_max === undefined) return `${name} ${c.weight_min}kg+`
     return `${name} ${c.weight_min}–${c.weight_max}kg`
   } catch { return 'Unknown' }
 }
 
+function cohortKey(c) {
+  if (c?.indicator_label) return `ind:${c.indicator_label}`
+  return `${c?.category}:${c?.weight_min}:${c?.weight_max}`
+}
+
 function SaleyardBlock({ saleyard }) {
   try {
     const sales = Array.isArray(saleyard?.sales) ? saleyard.sales : []
-    if (sales.length === 0) {
-      return (
-        <div className="market-saleyard-block">
-          <div className="market-section-label">{saleyard?.label ?? 'Saleyard'}</div>
-          <p className="muted">No recent sale data.</p>
-        </div>
-      )
-    }
+    if (sales.length === 0) return null
 
     const latest = sales[0]
-    const avgMap = {}
-    const countMap = {}
-    sales.forEach(sale => {
-      const cohorts = Array.isArray(sale?.cohorts) ? sale.cohorts : []
-      cohorts.forEach(c => {
-        const key = `${c.category}:${c.weight_min}:${c.weight_max}`
-        avgMap[key] = (avgMap[key] || 0) + (c.avg_c_kg || 0)
-        countMap[key] = (countMap[key] || 0) + 1
-      })
-    })
-
     const cohorts = Array.isArray(latest?.cohorts) ? latest.cohorts : []
+    const anyHead = cohorts.some((c) => c?.head !== null && c?.head !== undefined)
 
     return (
       <div className="market-saleyard-block">
@@ -90,17 +80,16 @@ function SaleyardBlock({ saleyard }) {
         </div>
         <div className="market-saleyard-header">
           <span>Category</span>
-          <span>Avg c/kg</span>
-          <span>{sales.length > 1 ? `${sales.length}-sale avg` : '—'}</span>
+          <span>{anyHead ? 'Hd' : ''}</span>
+          <span>Avg ¢/kg</span>
         </div>
         {cohorts.map((c) => {
-          const key = `${c.category}:${c.weight_min}:${c.weight_max}`
-          const rollingAvg = countMap[key] > 1 ? avgMap[key] / countMap[key] : null
+          const key = cohortKey(c)
           return (
             <div key={key} className="market-saleyard-row">
               <span className="market-cat-name">{cohortLabel(c)}</span>
+              <span className="market-head muted">{anyHead && c?.head ? Number(c.head).toLocaleString() : ''}</span>
               <span className="market-price">{fmt(c.avg_c_kg)}</span>
-              <span className="market-avg muted">{rollingAvg !== null ? fmt(rollingAvg) : '—'}</span>
             </div>
           )
         })}
@@ -186,7 +175,7 @@ function MarketPricesInner() {
         <>
           {fetchedDate && (
             <p className="muted" style={{ fontSize: '0.75rem', marginBottom: '0.75rem' }}>
-              Updated {fetchedDate} · Source: MLA Statistics API · Prices ¢/kg
+              Updated {fetchedDate} · Prices in ¢/kg liveweight
             </p>
           )}
 
