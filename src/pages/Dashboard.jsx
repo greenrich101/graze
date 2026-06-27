@@ -25,7 +25,7 @@ class MarketWrapper extends Component {
 }
 
 function Dashboard() {
-  const { propertyId } = useProperty()
+  const { propertyId, paddockLink, refreshNameMaps } = useProperty()
   const [mobs, setMobs] = useState([])
   const [paddockCount, setPaddockCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -197,6 +197,7 @@ function Dashboard() {
     }
 
     setEditingMob(null)
+    refreshNameMaps()
     fetchDashboard()
     return true
   }
@@ -259,7 +260,7 @@ function Dashboard() {
             <div key={mob.name} className="dashboard-card">
               <div className="dashboard-card-header">
                 <h3>
-                  <Link to={`/mobs/${encodeURIComponent(mob.name)}`}>{mob.name}</Link>
+                  <Link to={`/mobs/${mob.id}`}>{mob.name}</Link>
                   <button
                     className="btn btn-secondary btn-sm"
                     style={{ marginLeft: '0.5rem', fontSize: '0.75rem', padding: '0.1rem 0.5rem' }}
@@ -286,7 +287,7 @@ function Dashboard() {
                   <span className="detail-label">Current paddock</span>
                   <span className="detail-value">
                     {mob.currentPaddock ? (
-                      <Link to={`/paddocks/${encodeURIComponent(mob.currentPaddock)}`}>
+                      <Link to={paddockLink(mob.currentPaddock) || '#'}>
                         {mob.currentPaddock}
                       </Link>
                     ) : 'Not placed'}
@@ -304,7 +305,7 @@ function Dashboard() {
                   <span className="detail-label">Next paddock</span>
                   <span className="detail-value">
                     {mob.nextPaddock ? (
-                      <Link to={`/paddocks/${encodeURIComponent(mob.nextPaddock)}`}>
+                      <Link to={paddockLink(mob.nextPaddock) || '#'}>
                         {mob.nextPaddock}
                       </Link>
                     ) : '—'}
@@ -423,7 +424,7 @@ function Dashboard() {
                 )}
                 {executingMob !== mob.name && (
                   <Link
-                    to={`/mobs/${encodeURIComponent(mob.name)}/move`}
+                    to={`/mobs/${mob.id}/move`}
                     className="btn btn-secondary btn-sm"
                   >
                     {mob.hasPlannedMove ? 'Edit Plan' : 'Plan Move'}
@@ -435,8 +436,8 @@ function Dashboard() {
         </div>
       )}
 
-      <GenerateReport propertyId={propertyId} />
       <UniversalSearch propertyId={propertyId} />
+      <GenerateReport propertyId={propertyId} />
       <MarketWrapper />
     </div>
   )

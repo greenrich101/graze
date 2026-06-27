@@ -1580,3 +1580,68 @@ body {
   font-weight: 600;
 }
 
+.market-sparkline {
+  display: block;
+  flex-shrink: 0;
+}
+
+.market-eyci-head,
+.market-saleyard-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.market-eyci-head .market-section-label,
+.market-saleyard-block-head .market-section-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.market-season-block {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--gray-300);
+}
+
+.market-season-header {
+  display: grid;
+  grid-template-columns: 1fr 3.6rem 3.6rem 3.6rem;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--gray-600);
+  font-weight: 600;
+  padding-bottom: 0.4rem;
+}
+
+.market-season-header span:not(:first-child) {
+  text-align: right;
+}
+
+.market-season-row {
+  display: grid;
+  grid-template-columns: 1fr 3.6rem 3.6rem 3.6rem;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--gray-200);
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.market-season-row:last-child {
+  border-bottom: none;
+}
+
+.market-season-row .market-cat-name {
+  font-size: 0.85rem;
+}
+
+.market-season-row .market-price,
+.market-season-row .market-avg {
+  font-size: 0.85rem;
+}
+

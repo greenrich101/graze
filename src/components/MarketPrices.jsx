@@ -60,39 +60,118 @@ function cohortKey(c) {
   return `${c?.category}:${c?.weight_min}:${c?.weight_max}`
 }
 
+function Sparkline({ values, width = 160, height = 36, stroke = 'currentColor' }) {
+  if (!Array.isArray(values) || values.length < 2) return null
+  const finite = values.filter((v) => typeof v === 'number' && isFinite(v))
+  if (finite.length < 2) return null
+  const min = Math.min(...finite)
+  const max = Math.max(...finite)
+  const range = max - min || 1
+  const stepX = width / (finite.length - 1)
+  const pad = 2
+  const h = height - pad * 2
+  const pts = finite.map((v, i) => `${(i * stepX).toFixed(1)},${(pad + h - ((v - min) / range) * h).toFixed(1)}`).join(' ')
+  const last = finite[finite.length - 1]
+  const lastX = ((finite.length - 1) * stepX).toFixed(1)
+  const lastY = (pad + h - ((last - min) / range) * h).toFixed(1)
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="market-sparkline" aria-hidden="true">
+      <polyline points={pts} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={lastX} cy={lastY} r="2.2" fill={stroke} />
+    </svg>
+  )
+}
+
+const SEASON_CATEGORY_ORDER = { steer: 0, heifer: 1, cow: 2 }
+function sortSeasonRows(rows) {
+  return [...(rows || [])].sort((a, b) => {
+    const da = SEASON_CATEGORY_ORDER[a?.category] ?? 99
+    const db = SEASON_CATEGORY_ORDER[b?.category] ?? 99
+    return da - db
+  })
+}
+
+function SeasonBlock({ season }) {
+  const rows = sortSeasonRows(season)
+  if (rows.length === 0) return null
+  return (
+    <div className="market-season-block">
+      <div className="market-season-header">
+        <span>Indicator</span>
+        <span>Latest</span>
+        <span>MTD</span>
+        <span>YTD</span>
+      </div>
+      {rows.map((r) => (
+        <div key={r.indicator_label} className="market-season-row">
+          <span className="market-cat-name">{r.indicator_label}</span>
+          <span className="market-price">{fmt(r.latest_c_kg)}</span>
+          <span className="market-avg muted">{fmt(r.mtd_c_kg)}</span>
+          <span className="market-avg muted">{fmt(r.ytd_c_kg)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function saleyardAvgSeries(sales) {
+  // Return chronological list of avg-of-cohorts per sale (oldest → newest)
+  if (!Array.isArray(sales)) return []
+  return [...sales].reverse().map((s) => {
+    const cohorts = Array.isArray(s?.cohorts) ? s.cohorts : []
+    const nums = cohorts.map((c) => c?.avg_c_kg).filter((v) => typeof v === 'number' && !isNaN(v))
+    if (nums.length === 0) return null
+    return nums.reduce((a, b) => a + b, 0) / nums.length
+  }).filter((v) => v !== null)
+}
+
 function SaleyardBlock({ saleyard }) {
   try {
     const sales = Array.isArray(saleyard?.sales) ? saleyard.sales : []
-    if (sales.length === 0) return null
+    const season = Array.isArray(saleyard?.season) ? saleyard.season : []
+    if (sales.length === 0 && season.length === 0) return null
 
     const latest = sales[0]
     const cohorts = Array.isArray(latest?.cohorts) ? latest.cohorts : []
     const anyHead = cohorts.some((c) => c?.head !== null && c?.head !== undefined)
+    const trendSeries = saleyardAvgSeries(sales)
 
     return (
       <div className="market-saleyard-block">
-        <div className="market-section-label">
-          {saleyard?.label ?? 'Saleyard'}
-          <span className="market-section-qualifier">
-            {latest?.sale_date ? ` · ${latest.sale_date}` : ''}
-            {latest?.total_head ? ` · ${Number(latest.total_head).toLocaleString()} head` : ''}
-          </span>
+        <div className="market-saleyard-block-head">
+          <div className="market-section-label">
+            {saleyard?.label ?? 'Saleyard'}
+            <span className="market-section-qualifier">
+              {latest?.sale_date ? ` · ${latest.sale_date}` : ''}
+              {latest?.total_head ? ` · ${Number(latest.total_head).toLocaleString()} head` : ''}
+            </span>
+          </div>
+          {trendSeries.length >= 2 && (
+            <Sparkline values={trendSeries} width={130} height={32} stroke="var(--primary)" />
+          )}
         </div>
-        <div className="market-saleyard-header">
-          <span>Category</span>
-          <span>{anyHead ? 'Hd' : ''}</span>
-          <span>Avg ¢/kg</span>
-        </div>
-        {cohorts.map((c) => {
-          const key = cohortKey(c)
-          return (
-            <div key={key} className="market-saleyard-row">
-              <span className="market-cat-name">{cohortLabel(c)}</span>
-              <span className="market-head muted">{anyHead && c?.head ? Number(c.head).toLocaleString() : ''}</span>
-              <span className="market-price">{fmt(c.avg_c_kg)}</span>
+
+        {sales.length > 0 && (
+          <>
+            <div className="market-saleyard-header">
+              <span>Weight band</span>
+              <span>{anyHead ? 'Hd' : ''}</span>
+              <span>Avg ¢/kg</span>
             </div>
-          )
-        })}
+            {cohorts.map((c) => {
+              const key = cohortKey(c)
+              return (
+                <div key={key} className="market-saleyard-row">
+                  <span className="market-cat-name">{cohortLabel(c)}</span>
+                  <span className="market-head muted">{anyHead && c?.head ? Number(c.head).toLocaleString() : ''}</span>
+                  <span className="market-price">{fmt(c.avg_c_kg)}</span>
+                </div>
+              )
+            })}
+          </>
+        )}
+
+        <SeasonBlock season={season} />
       </div>
     )
   } catch {
@@ -180,7 +259,12 @@ function MarketPricesInner() {
           )}
 
           <div className="market-eyci-block">
-            <div className="market-section-label">EYCI</div>
+            <div className="market-eyci-head">
+              <div className="market-section-label">EYCI</div>
+              {Array.isArray(data.eyci?.series) && data.eyci.series.length >= 2 && (
+                <Sparkline values={data.eyci.series} width={170} height={40} stroke="var(--primary)" />
+              )}
+            </div>
             {data.eyci && typeof data.eyci === 'object' ? (
               <>
                 <div className="dashboard-stat">
@@ -194,6 +278,14 @@ function MarketPricesInner() {
                 <div className="dashboard-stat">
                   <span className="detail-label">4-week change</span>
                   <ChangeValue pct={data.eyci.trend4w} />
+                </div>
+                <div className="dashboard-stat">
+                  <span className="detail-label">MTD avg</span>
+                  <span className="detail-value">{fmt(data.eyci.mtd)}</span>
+                </div>
+                <div className="dashboard-stat">
+                  <span className="detail-label">YTD avg</span>
+                  <span className="detail-value">{fmt(data.eyci.ytd)}</span>
                 </div>
               </>
             ) : (

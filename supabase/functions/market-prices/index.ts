@@ -356,10 +356,44 @@ function dalbyCategory(desc: string): 'steer' | 'heifer' | 'cow' | null {
 // ─── EYCI (MLA Statistics API — unchanged) ────────────────────────────────────
 
 async function mlaFetch(path: string): Promise<Array<{ calendar_date: string; indicator_value: string }>> {
-  const res = await fetch(`${MLA_BASE}${path}`)
-  if (!res.ok) return []
-  const json = await res.json() as { data?: unknown[] }
-  return (json.data ?? []) as Array<{ calendar_date: string; indicator_value: string }>
+  // MLA paginates at 100 rows per page. Follow pages until empty.
+  // Supabase Edge IPs without UA get throttled by MLA's WAF — supply one.
+  const sep = path.includes('?') ? '&' : '?'
+  const all: Array<{ calendar_date: string; indicator_value: string }> = []
+  for (let page = 1; page <= 20; page++) {
+    const url = `${MLA_BASE}${path}${sep}page=${page}`
+    let res: Response
+    try {
+      res = await fetch(url, {
+        headers: {
+          'User-Agent': UA,
+          'Accept': 'application/json',
+        },
+      })
+    } catch (_e) {
+      break
+    }
+    if (!res.ok) {
+      // Retry once after a brief backoff on 429/5xx
+      if ((res.status === 429 || res.status >= 500) && page === 1) {
+        await new Promise(r => setTimeout(r, 800))
+        try {
+          res = await fetch(url, { headers: { 'User-Agent': UA, 'Accept': 'application/json' } })
+        } catch {
+          break
+        }
+        if (!res.ok) break
+      } else {
+        break
+      }
+    }
+    const json = await res.json().catch(() => ({} as { data?: unknown[] })) as { data?: unknown[] }
+    const rows = (json.data ?? []) as Array<{ calendar_date: string; indicator_value: string }>
+    if (rows.length === 0) break
+    all.push(...rows)
+    if (rows.length < 100) break
+  }
+  return all
 }
 
 function getLatestAndPrior(
@@ -378,6 +412,70 @@ function getLatestAndPrior(
 function pct(current: number, prior: number | null): number | null {
   if (prior === null || prior === 0 || isNaN(prior)) return null
   return ((current - prior) / prior) * 100
+}
+
+function monthStartStr(): string {
+  const d = new Date()
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-01`
+}
+
+function yearStartStr(): string {
+  const d = new Date()
+  return `${d.getUTCFullYear()}-01-01`
+}
+
+function avgOf(rows: Array<{ calendar_date: string; indicator_value: string }>, fromDate: string): number | null {
+  const nums = rows
+    .filter(r => r.calendar_date >= fromDate)
+    .map(r => parseFloat(r.indicator_value))
+    .filter(v => !isNaN(v))
+  if (nums.length === 0) return null
+  return nums.reduce((a, b) => a + b, 0) / nums.length
+}
+
+const MLA_SALEYARD_INDICATORS: Array<{
+  id: number
+  label: string
+  category: 'steer' | 'heifer' | 'cow'
+}> = [
+  { id: 2,  label: 'Restocker Steer',  category: 'steer'  },
+  { id: 3,  label: 'Feeder Steer',     category: 'steer'  },
+  { id: 4,  label: 'Heavy Steer',      category: 'steer'  },
+  { id: 12, label: 'Restocker Heifer', category: 'heifer' },
+  { id: 17, label: 'Feeder Heifer',    category: 'heifer' },
+  { id: 13, label: 'Processor Cow',    category: 'cow'    },
+]
+
+interface SaleyardSeasonRow {
+  indicator_label: string
+  category: 'steer' | 'heifer' | 'cow'
+  mtd_c_kg: number | null
+  ytd_c_kg: number | null
+  latest_c_kg: number | null
+}
+
+async function fetchSaleyardSeason(saleyardID: string): Promise<SaleyardSeasonRow[]> {
+  const ytdFrom = yearStartStr()
+  const mtdFrom = monthStartStr()
+  const to = dateStr(1)   // MLA /report/6 rejects toDate=today with 500
+  const out: SaleyardSeasonRow[] = []
+  for (const ind of MLA_SALEYARD_INDICATORS) {
+    const rows = await mlaFetch(
+      `/report/6?fromDate=${ytdFrom}&toDate=${to}&indicatorID=${ind.id}&saleyardID=${saleyardID}`,
+    ).catch(() => [])
+    const sorted = [...rows].sort((a, b) => a.calendar_date.localeCompare(b.calendar_date))
+    const latest = sorted.length ? parseFloat(sorted[sorted.length - 1].indicator_value) : null
+    const mtd = avgOf(rows, mtdFrom)
+    const ytd = avgOf(rows, ytdFrom)
+    out.push({
+      indicator_label: ind.label,
+      category: ind.category,
+      mtd_c_kg: mtd !== null ? Math.round(mtd * 10) / 10 : null,
+      ytd_c_kg: ytd !== null ? Math.round(ytd * 10) / 10 : null,
+      latest_c_kg: latest !== null && !isNaN(latest) ? Math.round(latest * 10) / 10 : null,
+    })
+  }
+  return out
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -400,6 +498,8 @@ Deno.serve(async (req: Request) => {
   const reqUrl = new URL(req.url)
   const debugMode = reqUrl.searchParams.has('debug')
   const refreshMode = reqUrl.searchParams.has('refresh')
+  const probeMode = reqUrl.searchParams.has('probe')
+
 
   // Cache check
   if (!debugMode && !refreshMode) {
@@ -419,23 +519,32 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // ── EYCI ────────────────────────────────────────────────────────────────────
-  const from = dateStr(36)
+  // ── EYCI (incl. MTD/YTD + daily series for chart) ──────────────────────────
   const to = dateStr(1)
-  const eyciRows = await mlaFetch(`/report/5?fromDate=${from}&toDate=${to}&indicatorID=${IND_EYCI}`)
-    .catch(() => [])
+  const eyciRows = await mlaFetch(
+    `/report/5?fromDate=${yearStartStr()}&toDate=${to}&indicatorID=${IND_EYCI}`,
+  ).catch(() => [])
 
-  const eyciCurrent = eyciRows.length
-    ? parseFloat([...eyciRows].sort((a, b) => a.calendar_date.localeCompare(b.calendar_date)).at(-1)!.indicator_value)
-    : null
+  const eyciSorted = [...eyciRows].sort((a, b) => a.calendar_date.localeCompare(b.calendar_date))
+  const eyciCurrent = eyciSorted.length ? parseFloat(eyciSorted.at(-1)!.indicator_value) : null
   const { prior: eyci7d } = getLatestAndPrior(eyciRows, 7)
   const { prior: eyci4w } = getLatestAndPrior(eyciRows, 28)
+  const eyciMtd = avgOf(eyciRows, monthStartStr())
+  const eyciYtd = avgOf(eyciRows, yearStartStr())
+
+  // Daily series for sparkline: just (date, value) pairs sorted ascending
+  const eyciSeries = eyciSorted
+    .map(r => ({ d: r.calendar_date, v: parseFloat(r.indicator_value) }))
+    .filter(p => !isNaN(p.v))
 
   const eyci = eyciCurrent !== null ? {
     current: Math.round(eyciCurrent * 10) / 10,
     units: 'c/kg cwt',
     weekChangePct: eyci7d !== null ? Math.round(pct(eyciCurrent, eyci7d)! * 10) / 10 : null,
     trend4w: eyci4w !== null ? Math.round(pct(eyciCurrent, eyci4w)! * 10) / 10 : null,
+    mtd: eyciMtd !== null ? Math.round(eyciMtd * 10) / 10 : null,
+    ytd: eyciYtd !== null ? Math.round(eyciYtd * 10) / 10 : null,
+    series: eyciSeries.map(p => p.v),  // values only, monotonic dates already
   } : null
 
   // ── Saleyard PDFs ────────────────────────────────────────────────────────────
@@ -472,10 +581,17 @@ Deno.serve(async (req: Request) => {
     })
   }
 
-  const markets: MarketData[] = [
-    { id: 'ROM', label: 'Roma Store', sales: romaSales.filter(Boolean) as SaleResult[] },
-    { id: 'WAR', label: 'Warwick',    sales: warwickSales.filter(Boolean) as SaleResult[] },
-    { id: 'DAL', label: 'Dalby',      sales: dalbySales.filter(Boolean) as SaleResult[] },
+  // Fetch MTD/YTD MLA indicator data for each saleyard in parallel with the rest
+  const [romSeason, warSeason, dalSeason] = await Promise.all([
+    fetchSaleyardSeason('ROM').catch(() => [] as SaleyardSeasonRow[]),
+    fetchSaleyardSeason('WAR').catch(() => [] as SaleyardSeasonRow[]),
+    fetchSaleyardSeason('DAL').catch(() => [] as SaleyardSeasonRow[]),
+  ])
+
+  const markets: Array<MarketData & { season?: SaleyardSeasonRow[] }> = [
+    { id: 'ROM', label: 'Roma Store', sales: romaSales.filter(Boolean) as SaleResult[], season: romSeason },
+    { id: 'WAR', label: 'Warwick',    sales: warwickSales.filter(Boolean) as SaleResult[], season: warSeason },
+    { id: 'DAL', label: 'Dalby',      sales: dalbySales.filter(Boolean) as SaleResult[], season: dalSeason },
   ]
 
   const payload = { eyci, saleyards: markets, fetchedAt: new Date().toISOString() }
